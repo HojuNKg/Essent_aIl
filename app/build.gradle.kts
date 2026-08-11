@@ -12,8 +12,8 @@ android {
         applicationId = "com.aiden.essentialmapper"
         minSdk = 31
         targetSdk = 36
-        versionCode = 1
-        versionName = "0.1"
+        versionCode = 2
+        versionName = "0.2"
     }
 
     buildTypes {
@@ -31,6 +31,12 @@ android {
     buildFeatures {
         compose = true
     }
+    applicationVariants.all {
+    outputs.all {
+        val output = this as com.android.build.gradle.internal.api.BaseVariantOutputImpl
+        output.outputFileName = "EssentAI-${versionName}.apk"
+    }
+    }
 }
 
 dependencies {
@@ -42,6 +48,7 @@ dependencies {
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
+    implementation(libs.compose.icons.extended)
     implementation(libs.androidx.datastore.preferences)
     debugImplementation(libs.androidx.ui.tooling)
 }

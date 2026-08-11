@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="keylog_service_description">Intercepts the Essential Key (scanCode 250) and launches apps by tap count.</string>
+    <string name="keylog_service_description">Перехватывает нажатия клавиши Essential и выполняет назначенные действия.</string>
+    <string name="app_name">Essent.aI/</string>
 </resources>

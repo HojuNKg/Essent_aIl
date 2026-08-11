@@ -7,6 +7,7 @@ import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -21,13 +22,35 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Brightness4
+import androidx.compose.material.icons.filled.BrightnessAuto
+import androidx.compose.material.icons.filled.BrightnessHigh
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.lightColorScheme
+import androidx.compose.material3.Slider
+import androidx.compose.material3.Switch
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Checkbox
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -38,6 +61,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
@@ -48,8 +72,40 @@ import androidx.core.graphics.drawable.toBitmap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.delay
+import androidx.compose.animation.core.*
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.*
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.filled.*
+import androidx.compose.material3.*
 
 data class AppInfo(val pkg: String, val label: String, val icon: ImageBitmap)
+
+@Composable
+fun TypewriterTitle(baseText: String = "Essent.aI/", targetText: String = "Not essential space") {
+    var text by remember { mutableStateOf(baseText) }
+    
+    LaunchedEffect(Unit) {
+        delay(2000) // Пауза перед началом анимации
+        
+        // Удаляем по буквам
+        while (text.isNotEmpty()) {
+            delay(100)
+            text = text.dropLast(1)
+        }
+        
+        delay(300)
+        
+        // Печатаем новый текст
+        for (char in targetText) {
+            delay(100)
+            text += char
+        }
+    }
+    
+    Text(text)
+}
 
 private suspend fun loadLaunchableApps(ctx: Context): List<AppInfo> =
     withContext(Dispatchers.IO) {
@@ -78,15 +134,49 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        setContent { MaterialTheme { ConfigScreen() } }
+        setContent { 
+            val ctx = LocalContext.current
+            val keyMap by Config.flow(ctx).collectAsState(initial = KeyMap())
+            var showSettings by remember { mutableStateOf(false) }
+            
+            val useDark = when (keyMap.theme) {
+                AppTheme.AUTO -> isSystemInDarkTheme()
+                AppTheme.LIGHT -> false
+                AppTheme.DARK -> true
+            }
+
+            val colorScheme = if (useDark) {
+                darkColorScheme(
+                    primary = Color.White,
+                    onPrimary = Color.Black,
+                    surface = Color.Black,
+                    onSurface = Color.White,
+                    background = Color.Black,
+                    onBackground = Color.White,
+                )
+            } else {
+                lightColorScheme(
+                    primary = Color.Black,
+                    onPrimary = Color.White,
+                )
+            }
+
+            MaterialTheme(colorScheme = colorScheme) {
+                if (showSettings) {
+                    SettingsScreen(keyMap, onBack = { showSettings = false })
+                } else {
+                    ConfigScreen(keyMap, onOpenSettings = { showSettings = true })
+                }
+            }
+        }
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ConfigScreen() {
+private fun ConfigScreen(keyMap: KeyMap, onOpenSettings: () -> Unit) {
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
-    val keyMap by Config.flow(ctx).collectAsState(initial = KeyMap())
     var apps by remember { mutableStateOf<List<AppInfo>?>(null) } // null while loading
     var picker by remember { mutableStateOf<TapSlot?>(null) }
 
@@ -95,7 +185,32 @@ private fun ConfigScreen() {
         apps = loadLaunchableApps(ctx)
     }
 
-    Scaffold(modifier = Modifier.fillMaxSize()) { inner ->
+    Scaffold(
+        modifier = Modifier.fillMaxSize(),
+        topBar = {
+            TopAppBar(
+                title = { TypewriterTitle() },
+                actions = {
+                    val nextTheme = when (keyMap.theme) {
+                        AppTheme.AUTO -> AppTheme.LIGHT
+                        AppTheme.LIGHT -> AppTheme.DARK
+                        AppTheme.DARK -> AppTheme.AUTO
+                    }
+                    val icon = when (keyMap.theme) {
+                        AppTheme.AUTO -> Icons.Default.BrightnessAuto
+                        AppTheme.LIGHT -> Icons.Default.BrightnessHigh
+                        AppTheme.DARK -> Icons.Default.Brightness4
+                    }
+                    IconButton(onClick = { scope.launch { Config.setTheme(ctx, nextTheme) } }) {
+                        Icon(icon, contentDescription = "Сменить тему")
+                    }
+                    IconButton(onClick = onOpenSettings) {
+                        Icon(Icons.Default.Settings, contentDescription = "Настройки")
+                    }
+                }
+            )
+        }
+    ) { inner ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -103,32 +218,59 @@ private fun ConfigScreen() {
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text("EssentialMapper", style = MaterialTheme.typography.headlineSmall)
             Text(
-                "Assign an app to each Essential Key tap count.",
+                "Назначьте действие для каждого типа нажатия клавиши Essential.",
                 style = MaterialTheme.typography.bodyMedium,
             )
-            OutlinedButton(onClick = { openAccessibilitySettings(ctx) }) {
-                Text("Open Accessibility settings")
-            }
             HorizontalDivider()
 
-            TapSlot.entries.forEach { slot ->
-                val value = keyMap.forSlot(slot)
-                SlotRow(
-                    slot = slot,
-                    valueLabel = slotDisplay(value, apps),
-                    icon = apps?.find { it.pkg == value }?.icon,
-                    enabled = apps != null,
-                    onClick = { picker = slot },
-                )
-            }
+            LazyColumn(
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.weight(1f)
+            ) {
+                items(TapSlot.entries.toTypedArray()) { slot ->
+                    val value = keyMap.forSlot(slot)
+                    val customConfig = keyMap.customConfigs[slot] ?: CustomConfig()
+                    var expanded by remember { mutableStateOf(false) }
 
-            if (apps == null) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
-                    Spacer(Modifier.width(8.dp))
-                    Text("Loading apps…")
+                    SlotRow(
+                        slot = slot,
+                        valueLabel = slotDisplay(value, apps),
+                        icon = apps?.find { it.pkg == value }?.icon,
+                        enabled = apps != null,
+                        isCustom = value == Config.ACTION_CUSTOM_PANEL,
+                        expanded = expanded,
+                        onExpandToggle = { expanded = !expanded },
+                        onClick = { picker = slot },
+                    )
+
+                    if (expanded && value == Config.ACTION_CUSTOM_PANEL) {
+                        CustomActionSettings(
+                            slot = slot,
+                            config = customConfig,
+                            apps = apps ?: emptyList(),
+                            onUpdateType = { scope.launch { Config.setCustomActionType(ctx, slot, it) } },
+                            onUpdateMacroMode = { scope.launch { Config.setMacroMode(ctx, slot, it) } },
+                            onUpdateFavorites = { scope.launch { Config.setFavoriteApps(ctx, slot, it) } },
+                            onStartRecording = {
+                                val intent = Intent(ctx, EssentialKeyService::class.java).apply {
+                                    action = "com.aiden.essentialmapper.START_RECORDING"
+                                    putExtra("slot", slot.key)
+                                }
+                                ctx.startService(intent)
+                            }
+                        )
+                    }
+                }
+
+                if (apps == null) {
+                    item {
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 8.dp)) {
+                            CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+                            Spacer(Modifier.width(8.dp))
+                            Text("Загрузка приложений…")
+                        }
+                    }
                 }
             }
         }
@@ -139,6 +281,7 @@ private fun ConfigScreen() {
     if (slot != null && loaded != null) {
         AppPickerDialog(
             title = slot.label,
+            slot = slot,
             apps = loaded,
             current = keyMap.forSlot(slot),
             onPick = { pkg ->
@@ -150,10 +293,210 @@ private fun ConfigScreen() {
     }
 }
 
+@Composable
+private fun CustomActionSettings(
+    slot: TapSlot,
+    config: CustomConfig,
+    apps: List<AppInfo>,
+    onUpdateType: (CustomActionType) -> Unit,
+    onUpdateMacroMode: (MacroMode) -> Unit,
+    onUpdateFavorites: (List<String>) -> Unit,
+    onStartRecording: () -> Unit,
+) {
+    Surface(
+        tonalElevation = 1.dp,
+        shape = RoundedCornerShape(12.dp),
+        modifier = Modifier.padding(start = 16.dp, top = 4.dp, bottom = 8.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Text("Настройка действия", style = MaterialTheme.typography.labelLarge)
+            
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                CustomActionOption("По умолчанию", CustomActionType.NONE, config.type, onUpdateType)
+                CustomActionOption("Избранные приложения", CustomActionType.FAVORITES, config.type, onUpdateType)
+                CustomActionOption("Повтор записанных действий", CustomActionType.RECORDING, config.type, onUpdateType)
+            }
+
+            if (config.type == CustomActionType.RECORDING) {
+                HorizontalDivider()
+                Text("Режим макроса", style = MaterialTheme.typography.labelMedium)
+                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    MacroMode.entries.forEach { mode ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.clickable { onUpdateMacroMode(mode) }
+                        ) {
+                            RadioButton(selected = config.macroMode == mode, onClick = null)
+                            Spacer(Modifier.width(4.dp))
+                            Text(mode.label)
+                        }
+                    }
+                }
+                Button(onClick = onStartRecording, modifier = Modifier.fillMaxWidth()) {
+                    Text(if (config.recordedGesture.isEmpty()) "Записать макрос" else "Перезаписать макрос")
+                }
+            }
+
+            if (config.type == CustomActionType.FAVORITES) {
+                HorizontalDivider()
+                Text("Избранные приложения", style = MaterialTheme.typography.labelMedium)
+                apps.forEach { app ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                val newList = if (config.favoriteApps.contains(app.pkg)) {
+                                    config.favoriteApps - app.pkg
+                                } else {
+                                    config.favoriteApps + app.pkg
+                                }
+                                onUpdateFavorites(newList)
+                            }
+                            .padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        androidx.compose.foundation.Image(
+                            bitmap = app.icon,
+                            contentDescription = null,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(Modifier.width(12.dp))
+                        Text(app.label, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
+                        Checkbox(
+                            checked = config.favoriteApps.contains(app.pkg),
+                            onCheckedChange = null,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SettingsScreen(keyMap: KeyMap, onBack: () -> Unit) {
+    val ctx = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var apps by remember { mutableStateOf<List<AppInfo>?>(null) }
+    
+    LaunchedEffect(Unit) {
+        apps = loadLaunchableApps(ctx)
+    }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Настройки") },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад")
+                    }
+                }
+            )
+        }
+    ) { inner ->
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(inner)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(24.dp)
+        ) {
+            item {
+                OutlinedButton(
+                    onClick = { openAccessibilitySettings(ctx) },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Настройки спец. возможностей")
+                }
+            }
+
+            item { HorizontalDivider() }
+
+            item { Text("Настраиваемая кнопка", style = MaterialTheme.typography.titleLarge) }
+
+            item {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Сторона расположения", style = MaterialTheme.typography.labelMedium)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(if (keyMap.panelSide == PanelSide.LEFT) "Слева" else "Справа")
+                        Switch(
+                            checked = keyMap.panelSide == PanelSide.RIGHT,
+                            onCheckedChange = { isRight ->
+                                scope.launch {
+                                    Config.setPanelConfig(
+                                        ctx,
+                                        if (isRight) PanelSide.RIGHT else PanelSide.LEFT,
+                                        keyMap.panelYOffset
+                                    )
+                                }
+                            }
+                        )
+                    }
+                }
+            }
+
+            item {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.Bottom
+                    ) {
+                        Text("Высота расположения", style = MaterialTheme.typography.labelMedium)
+                        Text(
+                            "${(keyMap.panelYOffset * 100).toInt()}%",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                    Slider(
+                        value = keyMap.panelYOffset,
+                        onValueChange = { newValue ->
+                            scope.launch {
+                                Config.setPanelConfig(ctx, keyMap.panelSide, newValue)
+                            }
+                        }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CustomActionOption(
+    label: String,
+    type: CustomActionType,
+    current: CustomActionType,
+    onSelect: (CustomActionType) -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onSelect(type) },
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        RadioButton(selected = type == current, onClick = null)
+        Spacer(Modifier.width(8.dp))
+        Text(label)
+    }
+}
+
 /** Resolve a stored slot value to a human label. */
 private fun slotDisplay(value: String?, apps: List<AppInfo>?): String = when {
-    value == null -> "None"
-    value == Config.ACTION_FLASHLIGHT -> "Flashlight (toggle)"
+    value == null -> "По умолчанию"
+    value == Config.ACTION_FLASHLIGHT -> "Фонарик (вкл/выкл)"
+    value == Config.ACTION_BACK -> "Назад"
+    value == Config.ACTION_KILL_ESSENTIAL -> "Kill Essential Space"
+    value == Config.ACTION_KILL_NOTES -> "Kill Notes"
+    value == Config.ACTION_CUSTOM_PANEL -> "Настраиваемая"
     else -> apps?.find { it.pkg == value }?.label ?: value
 }
 
@@ -163,6 +506,9 @@ private fun SlotRow(
     valueLabel: String,
     icon: ImageBitmap?,
     enabled: Boolean,
+    isCustom: Boolean,
+    expanded: Boolean,
+    onExpandToggle: () -> Unit,
     onClick: () -> Unit,
 ) {
     Surface(
@@ -188,6 +534,16 @@ private fun SlotRow(
                     modifier = Modifier.size(40.dp),
                 )
             }
+            
+            if (isCustom) {
+                Spacer(Modifier.width(8.dp))
+                IconButton(onClick = onExpandToggle) {
+                    Icon(
+                        if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                        contentDescription = "Настройки"
+                    )
+                }
+            }
         }
     }
 }
@@ -195,6 +551,7 @@ private fun SlotRow(
 @Composable
 private fun AppPickerDialog(
     title: String,
+    slot: TapSlot,
     apps: List<AppInfo>,
     current: String?,
     onPick: (String?) -> Unit,
@@ -219,14 +576,45 @@ private fun AppPickerDialog(
                 )
                 LazyColumn(Modifier.weight(1f)) {
                     item {
-                        PickRow("None", null, selected = current == null) { onPick(null) }
+                        PickRow("По умолчанию", null, selected = current == null) { onPick(null) }
                     }
                     item {
                         PickRow(
-                            "Flashlight (toggle)",
+                            "Фонарик (вкл/выкл)",
                             null,
                             selected = current == Config.ACTION_FLASHLIGHT,
                         ) { onPick(Config.ACTION_FLASHLIGHT) }
+                    }
+                    item {
+                        PickRow(
+                            "Назад",
+                            null,
+                            selected = current == Config.ACTION_BACK,
+                        ) { onPick(Config.ACTION_BACK) }
+                    }
+                    item {
+                        PickRow(
+                            "Настраиваемая",
+                            null,
+                            selected = current == Config.ACTION_CUSTOM_PANEL,
+                        ) { onPick(Config.ACTION_CUSTOM_PANEL) }
+                    }
+                    if (slot == TapSlot.SINGLE || slot == TapSlot.LONG) {
+                        item {
+                            PickRow(
+                                "Kill Notes",
+                                null,
+                                selected = current == Config.ACTION_KILL_NOTES,
+                            ) { onPick(Config.ACTION_KILL_NOTES) }
+                        }
+                    } else {
+                        item {
+                            PickRow(
+                                "Kill Essential Space",
+                                null,
+                                selected = current == Config.ACTION_KILL_ESSENTIAL,
+                            ) { onPick(Config.ACTION_KILL_ESSENTIAL) }
+                        }
                     }
                     items(apps, key = { it.pkg }) { a ->
                         PickRow(a.label, a.icon, selected = current == a.pkg) { onPick(a.pkg) }

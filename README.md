@@ -1,10 +1,10 @@
-# EssentialMapper
+# Essent.aI/
 
 Remap the Nothing Phone (3a) Lite's hardware **Essential Key** to launch an app or
 toggle the flashlight by tap count — single, double, or triple. Personal, sideloaded tool.
 
 <p align="center">
-  <img src="docs/screenshot.png" alt="EssentialMapper config screen" width="300">
+  <img src="docs/screenshot.png" alt="Essent.aI/ config screen" width="300">
 </p>
 
 Default mapping is **single → Claude · double → Wallet · triple → flashlight**; change any
