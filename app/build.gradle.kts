@@ -2,18 +2,19 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+    id("kotlin-parcelize")
 }
 
 android {
-    namespace = "com.aiden.essentialmapper"
+    namespace = "com.HojuNK.essent_all"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.aiden.essentialmapper"
-        minSdk = 31
+        applicationId = "com.HojuNK.essent_all"
+        minSdk = 33
         targetSdk = 36
-        versionCode = 2
-        versionName = "0.2"
+        versionCode = 4
+        versionName = "0.5"
     }
 
     buildTypes {
@@ -50,5 +51,6 @@ dependencies {
     implementation(libs.androidx.material3)
     implementation(libs.compose.icons.extended)
     implementation(libs.androidx.datastore.preferences)
+    implementation(group = "", name = "glyph-matrix-sdk-2.0", ext = "aar")
     debugImplementation(libs.androidx.ui.tooling)
 }

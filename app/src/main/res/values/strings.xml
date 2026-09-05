@@ -2,4 +2,332 @@
 <resources>
     <string name="keylog_service_description">Перехватывает нажатия клавиши Essential и выполняет назначенные действия.</string>
     <string name="app_name">Essent.aI/</string>
+
+    <!-- Settings -->
+    <string name="settings">Настройки</string>
+    <string name="accessibility_settings">Настройки спец. возможностей</string>
+    <string name="app_theme">Тема приложения</string>
+    <string name="theme_auto">Авто</string>
+    <string name="theme_light">Светлая</string>
+    <string name="theme_dark">Темная</string>
+    <string name="app_language">Язык приложения</string>
+    <string name="lang_system">Системный</string>
+    <string name="lang_english">English</string>
+    <string name="lang_russian">Русский</string>
+    <string name="essential_key_position">Положение Essential key</string>
+    <string name="side_position">Сторона расположения</string>
+    <string name="side_left">Слева</string>
+    <string name="side_right">Справа</string>
+    <string name="y_offset">Высота расположения</string>
+    <string name="backup">Резервное копирование</string>
+    <string name="export">ЭКСПОРТ</string>
+    <string name="import_config">ИМПОРТ</string>
+
+    <!-- Tap Slots -->
+    <string name="tap_single">Одинарное нажатие</string>
+    <string name="tap_long">Долгое нажатие</string>
+    <string name="tap_double">Двойное нажатие</string>
+    <string name="tap_triple">Тройное нажатие</string>
+    <string name="tap_shortcut">Ярлык ивента</string>
+
+    <!-- Controls -->
+    <string name="control_edit">Редактировать</string>
+    <string name="control_flashlight">Фонарик</string>
+    <string name="control_rotation">Автоповорот</string>
+    <string name="control_volume">Звук</string>
+    <string name="control_dnd">Не беспокоить</string>
+    <string name="control_settings">Настройки</string>
+    <string name="control_app">Приложение</string>
+    <string name="control_url">Ссылка</string>
+
+    <!-- Macros -->
+    <string name="macro_single">Одиночный</string>
+    <string name="macro_loop">Цикличный</string>
+
+    <string name="default_action">По умолчанию</string>
+    <string name="action_touch">Касание</string>
+    <string name="action_swipe_precise">Точный свайп</string>
+    <string name="action_swipe">Свайп</string>
+    <string name="action_delay">Задержка</string>
+    <string name="action_brightness">Яркость</string>
+    <string name="favorites">Избранные приложения</string>
+    <string name="control_panel">Панель управления</string>
+    <string name="action_home">Домой</string>
+    <string name="action_notifications">Уведомления</string>
+    <string name="action_flashlight_toggle">Фонарик (вкл/выкл)</string>
+    <string name="action_kill_essential">Закрыть Essential Space</string>
+    <string name="action_kill_notes">Закрыть Заметки/Скриншот</string>
+    <string name="action_back">Назад</string>
+    <string name="action_glyph">Глифы</string>
+    <string name="action_screenshot">Скриншот</string>
+    <string name="action_lock_screen">Блокировка экрана</string>
+    <string name="action_split_screen">Разделение экрана</string>
+    <string name="action_volume">Громкость</string>
+    <string name="action_media">Медиа</string>
+    <string name="action_dnd_toggle">Не беспокоить (вкл/выкл)</string>
+    <string name="action_clear_notifications">Очистить уведомления</string>
+    <string name="action_macro">Макрос</string>
+    <string name="action_macro_not_selected">Не выбран</string>
+    <string name="action_auto_brightness">Авто яркость</string>
+    <string name="action_url">URL</string>
+    <string name="action_theme">Тема</string>
+    <string name="unit_seconds">сек.</string>
+    <string name="action_glyph_toggle">Gliph (вкл/выкл)</string>
+    <string name="shortcut_prefix">Ярлык:</string>
+    <string name="assign_action_hint">Назначьте действие для каждого типа нажатия клавиши Essential.</string>
+    <string name="edit_mode">Редактирование</string>
+    <string name="done">ГОТОВО</string>
+    <string name="select_app">ВЫБРАТЬ ПРИЛОЖЕНИЕ</string>
+    <string name="enter_url">ВВЕСТИ ССЫЛКУ</string>
+    <string name="tap_in_cell">ТАПНИТЕ В КЛЕТКУ</string>
+    <string name="move">ПЕРЕМЕСТИТЬ</string>
+    <string name="add_button">Добавить кнопку</string>
+    <string name="enter_url_title">Введите URL</string>
+    <string name="cancel">ОТМЕНА</string>
+    <string name="select_app_title">Выберите приложение</string>
+    <string name="search_hint">Поиск...</string>
+    <string name="action_auto_brightness_dots">Авто яркость...</string>
+    <string name="open_app">Открыть приложение</string>
+    <string name="action_touch_screen">Касание экрана</string>
+    <string name="action_swipe_screen">Свайп экрана</string>
+    <string name="action_set_brightness">Установить яркость</string>
+    <string name="action_volume_control">Управление громкостью</string>
+    <string name="action_media_control">Управление медиа</string>
+    <string name="action_open_url">Открыть URL</string>
+    <string name="action_dnd">Не беспокоить (DND)</string>
+    <string name="action_change_theme">Сменить тему</string>
+    <string name="events">Ивенты</string>
+    <string name="nav_key">Кнопка</string>
+    <string name="nav_events">Ивенты</string>
+    <string name="nav_macros">Макросы</string>
+    <string name="nav_games">Глиф игра</string>
+    <string name="macro_execution_mode">Режим выполнения</string>
+    <string name="select_macro">Выберите макрос</string>
+    <string name="macros_empty">Список макросов пуст</string>
+
+    <!-- Accessibility -->
+    <string name="accessibility_setup_title">Настройка доступа</string>
+    <string name="accessibility_permission_required">Требуется разрешение</string>
+    <string name="accessibility_enable_msg">Пожалуйста, включите Essent.aI в специальных возможностях</string>
+
+    <!-- Pickers & Config -->
+    <string name="change_coords">Изменить координаты</string>
+    <string name="change_swipe">Изменить свайп</string>
+    <string name="change_brightness">Изменить яркость</string>
+    <string name="change_volume">Изменить громкость</string>
+    <string name="change_media">Изменить медиа</string>
+    <string name="change_url">Изменить URL</string>
+    <string name="change_theme">Изменить тему</string>
+    <string name="select_favorites_title">Выберите избранные приложения</string>
+    <string name="display_settings">Настройки отображения</string>
+    <string name="keep_on_click">Не скрывать при нажатии на панель</string>
+    <string name="keep_on_outside">Не скрывать при нажатии вне ярлыка</string>
+    <string name="keep_on_key">Не скрывать при нажатии Essential Key</string>
+    <string name="auto_hide">Автоматическое скрытие</string>
+    <string name="never_hide">Не скрывать</string>
+    <string name="setup_control_panel">Настроить панель управления</string>
+
+    <!-- States -->
+    <string name="state_off_label">ВЫКЛЮЧЕНО</string>
+    <string name="state_on_label">ВКЛЮЧЕНО</string>
+    <string name="state_connected">Подключено</string>
+    <string name="state_none">Нет</string>
+    <string name="state_locked">Заблокирован</string>
+    <string name="state_unlocked">Разблокирован</string>
+    <string name="state_present">Есть</string>
+    <string name="state_moving">Идёт</string>
+    <string name="state_still">Стоит</string>
+    <string name="state_active">Активна</string>
+    <string name="state_on_short">ВКЛ</string>
+    <string name="state_off_short">ВЫКЛ</string>
+
+    <!-- Dialogs -->
+    <string name="delete_event_q">Удалить ивент?</string>
+    <string name="delete_event_msg">\"%1$s\" будет удален безвозвратно.</string>
+    <string name="delete_btn">УДАЛИТЬ</string>
+
+    <!-- Macro Types -->
+    <string name="macro_type_tap">Одиночное касание</string>
+    <string name="macro_type_swipe">Одиночный свайп</string>
+    <string name="macro_type_combo">Комбинация действий</string>
+    <string name="macros_empty_msg">Список пуст. Нажмите +, чтобы создать макрос.</string>
+
+    <!-- Macro Editor -->
+    <string name="macro_setup_title">Настройка макроса</string>
+    <string name="save">СОХРАНИТЬ</string>
+    <string name="macro_name_hint">Название макроса</string>
+    <string name="macro_actions_label">Действия макроса:</string>
+    <string name="touch_btn">КАСАНИЕ</string>
+    <string name="swipe_btn">СВАЙП</string>
+    <string name="delay_btn">ЗАДЕРЖКА</string>
+    <string name="edit_title">Редактирование</string>
+    <string name="swipe_convert_msg">Точные свайпы нельзя редактировать визуально, но их можно преобразовать в обычные свайпы (останется только начало и конец траектории). Уверены?</string>
+    <string name="convert_btn">ПРЕОБРАЗОВАТЬ</string>
+    <string name="no_macros_msg">У вас еще нет созданных макросов</string>
+
+    <!-- Event Editor -->
+    <string name="event_logic_setup">Настройка логики</string>
+    <string name="event_name_shortcut_setup">Название и ярлык</string>
+    <string name="next_btn">ДАЛЕЕ</string>
+    <string name="event_name_hint">Название ивента</string>
+    <string name="event_shortcut_toggle">Подтверждение ярлыком ивента</string>
+    <string name="shortcut_settings">Настройки ярлыка</string>
+    <string name="delay_before_exec">Задержка перед выполнением</string>
+    <string name="event_final_step_desc">На финальном этапе задайте имя, иконку и дополнительные параметры поведения.</string>
+    <string name="event_summary_template">Когда выполняется жест %1$s, то если выполнено условий: %2$d, %3$s будет выполнено действий: %4$d.</string>
+    <string name="event_shortcut_mid_text">то появится ярлык подтверждения, и после нажатия </string>
+    <string name="event_exclusion_template">Но если выполнено исключений: %1$d, то действие не выполнится.</string>
+    <string name="when_gesture_exec">Когда выполняется жест:</string>
+    <string name="if_conditions">То если:</string>
+    <string name="add_condition">ДОБАВИТЬ УСЛОВИЕ</string>
+    <string name="under_condition">При условии: </string>
+    <string name="all_and">Всех сразу (И)</string>
+    <string name="any_or">Хотя бы одного (ИЛИ)</string>
+    <string name="then_actions">Тогда будет:</string>
+    <string name="add_action">ДОБАВИТЬ ДЕЙСТВИЕ</string>
+    <string name="except_exclusions">Кроме:</string>
+    <string name="add_exclusion">ДОБАВИТЬ ИСКЛЮЧЕНИЕ</string>
+    <string name="always">Всегда</string>
+    <string name="if_opened_one_of">Если открыто одно из:</string>
+
+    <!-- Rotations -->
+    <string name="rotation_portrait">Портрет</string>
+    <string name="rotation_face_up">Экраном вверх</string>
+    <string name="rotation_face_down">Экраном вниз</string>
+    <string name="rotation_landscape_left">Ландшафт (лев.)</string>
+    <string name="rotation_landscape_right">Ландшафт (прав.)</string>
+    <string name="rotation_portrait_desc">Портрет (в руке)</string>
+    <string name="rotation_face_up_desc">Экраном вверх (лежа)</string>
+    <string name="rotation_face_down_desc">Экраном вниз (лежа)</string>
+    <string name="rotation_landscape_left_desc">Ландшафт (левый)</string>
+    <string name="rotation_landscape_right_desc">Ландшафт (правый)</string>
+    <string name="orientation_label">Ориентация: %1$s</string>
+
+    <!-- Light & Ranges -->
+    <string name="light_threshold">Порог освещенности</string>
+    <string name="light_condition_desc">Условие сработает, если свет в диапазоне:</string>
+    <string name="light_range_label">Свет: от %1$d%% до %2$d%%</string>
+    <string name="range_percent_label">от %1$d%% до %2$d%%</string>
+    <string name="range_condition_desc">Условие сработает в диапазоне:</string>
+    <string name="brightness_range_label">Яркость: от %1$s%% до %2$s%%</string>
+    <string name="battery_range_label">Батарея: от %1$s%% до %2$s%%</string>
+    <string name="brightness_screen_title">Яркость экрана</string>
+    <string name="battery_charge_title">Заряд батареи</string>
+
+    <!-- Condition Pickers -->
+    <string name="select_condition_title">Выберите условие</string>
+    <string name="cond_app_label">Приложение открыто...</string>
+    <string name="cond_time_label">Отрезок времени...</string>
+    <string name="cond_rotation_label">Ориентация устройства...</string>
+    <string name="cond_light_label">Освещенность...</string>
+    <string name="cond_brightness_label">Яркость экрана...</string>
+    <string name="cond_battery_label">Заряд батареи...</string>
+    <string name="cond_wifi_label">Состояние WiFi...</string>
+    <string name="cond_bt_label">Состояние Bluetooth...</string>
+    <string name="cond_loc_label">Геолокация (GPS)...</string>
+    <string name="cond_data_label">Мобильный интернет...</string>
+    <string name="cond_charging_label">Зарядка...</string>
+    <string name="cond_lock_label">Экран заблокирован...</string>
+    <string name="cond_airplane_label">Авиарежим...</string>
+    <string name="cond_nfc_label">NFC...</string>
+    <string name="cond_auto_rotate_label">Автоповорот...</string>
+    <string name="cond_headphones_label">Наушники...</string>
+    <string name="cond_dnd_label">Не беспокоить...</string>
+    <string name="cond_motion_label">Активность движения...</string>
+    <string name="cond_dark_mode_label">Темная тема...</string>
+    <string name="cond_silent_label">Без звука...</string>
+    <string name="cond_vibrate_label">Виброрежим...</string>
+    <string name="cond_hotspot_label">Точка доступа...</string>
+
+    <!-- Action Pickers -->
+    <string name="select_action_title">Выберите действие</string>
+    <string name="action_wait_confirmation">Продолжить при подтверждении</string>
+    <string name="action_open_notifications">Открыть уведомления</string>
+
+    <!-- Tabs -->
+    <string name="tab_emojis">Смайлики</string>
+    <string name="tab_apps">Приложения</string>
+    <string name="tab_symbols">Символы</string>
+    <string name="symbol_hint">Введи 1-3 символа</string>
+    <string name="select_btn">ВЫБРАТЬ</string>
+
+    <!-- Volume & Media -->
+    <string name="stream_label">Поток:</string>
+    <string name="stream_media">Медиа</string>
+    <string name="stream_ring">Звонок</string>
+    <string name="stream_notif">Увед.</string>
+    <string name="action_label">Действие:</string>
+    <string name="action_up">Вверх</string>
+    <string name="action_down">Вниз</string>
+    <string name="action_mute">Выкл</string>
+    <string name="action_set_percent">Задать %</string>
+    <string name="media_buttons_title">Медиа кнопки</string>
+    <string name="media_next">Следующий трек</string>
+    <string name="media_prev">Предыдущий трек</string>
+    <string name="media_stop">Стоп</string>
+    <string name="url_hint">URL (google.com)</string>
+
+    <!-- Themes & Auto Brightness -->
+    <string name="theme_dark_short">Тёмная</string>
+    <string name="toggle">Переключить</string>
+    <string name="turn_on">Включить</string>
+    <string name="turn_off">Выключить</string>
+
+    <!-- Time & Touch -->
+    <string name="select_time">Выберите время</string>
+    <string name="time_from">С:</string>
+    <string name="time_to">До:</string>
+    <string name="touch_picker_hint">Перетащите круг или нажмите для удержания</string>
+    <string name="swipe_picker_hint">Настройте свайп или нажмите на A/B для удержания</string>
+    <string name="confirm_btn">ПОДТВЕРДИТЬ</string>
+    <string name="hold_ms_title">Удержание (мс)</string>
+
+    <!-- Priority -->
+    <string name="event_priority_title">Приоритет ивентов</string>
+    <string name="priority_drag_hint">Перетащите ивент для изменения приоритета (первые в списке проверяются раньше).</string>
+    <string name="slot_single_short">Один.</string>
+    <string name="slot_long_short">Удерж.</string>
+    <string name="slot_double_short">Двой.</string>
+    <string name="slot_triple_short">Трой.</string>
+
+    <!-- Glyph -->
+    <string name="glyph_control_title">Управление Глифами</string>
+    <string name="glyph_permission_msg">Для переключения системного тумблера Глифов требуется разрешение на изменение системных настроек.</string>
+    <string name="grant_permission_btn">ДАТЬ РАЗРЕШЕНИЕ</string>
+    <string name="glyph_permission_ok">Разрешение получено. Вы можете переключать Глифы программно.</string>
+    <string name="toggle_glyphs_btn">ПЕРЕКЛЮЧИТЬ ГЛИФЫ</string>
+    <string name="glyph_runner_btn">ГЛИФ БЕГУНОК</string>
+
+    <!-- Games & General -->
+    <string name="games_title">Gliph game</string>
+    <string name="in_development_msg">Этот раздел находится в разработке</string>
+    <string name="events_empty_msg">Список пуст. Нажмите +, чтобы добавить правило.</string>
+    <string name="add_event">Добавить ивент</string>
+    <string name="add_macro">Добавить макрос</string>
+
+    <string name="kill_essential_space">Kill Essential Space</string>
+    <string name="kill_notes">Kill Notes</string>
+    <string name="choose_hide_method_msg">Выберите хотя бы один способ скрыть ярлык!</string>
+    <string name="copy_suffix"> (копия)</string>
+    <!-- Labels -->
+    <string name="time_label">Время</string>
+    <string name="light_label">Свет</string>
+    <string name="brightness_label">Яркость</string>
+    <string name="battery_label">Батарея</string>
+    <string name="wifi_label">WiFi</string>
+    <string name="bt_label">Bluetooth</string>
+    <string name="location_label">Геолокация</string>
+    <string name="mobile_data_label">Мобильные данные</string>
+    <string name="charging_label">Зарядка</string>
+    <string name="screen_lock_label">Экран</string>
+    <string name="airplane_mode_label">Авиарежим</string>
+    <string name="nfc_label">NFC</string>
+    <string name="auto_rotate_label">Автоповорот</string>
+    <string name="headphones_label">Наушники</string>
+    <string name="dnd_label">Не беспокоить</string>
+    <string name="motion_label">Движение</string>
+    <string name="dark_mode_label">Темная тема</string>
+    <string name="silent_mode_label">Без звука</string>
+    <string name="vibrate_mode_label">Виброрежим</string>
+    <string name="hotspot_label">Точка доступа</string>
 </resources>
