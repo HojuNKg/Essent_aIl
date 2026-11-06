@@ -1,0 +1,472 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="keylog_service_description">Intercepts Essential key presses and performs assigned actions.</string>
+    <string name="app_name">Essent.aI/</string>
+
+    <!-- Settings -->
+    <string name="settings">Settings</string>
+    <string name="accessibility_settings">Accessibility Settings</string>
+    <string name="app_theme">App Theme</string>
+    <string name="theme_auto">Auto</string>
+    <string name="theme_light">Light</string>
+    <string name="theme_dark">Dark</string>
+    <string name="app_language">App Language</string>
+    <string name="lang_system">System</string>
+    <string name="lang_english">English</string>
+    <string name="lang_russian">Russian</string>
+    <string name="essential_key_position">Essential key position</string>
+    <string name="side_position">Side position</string>
+    <string name="side_left">Left</string>
+    <string name="side_right">Right</string>
+    <string name="y_offset">Vertical offset</string>
+    <string name="backup">Backup</string>
+    <string name="export">EXPORT</string>
+    <string name="import_config">IMPORT</string>
+
+    <!-- Tap Slots -->
+    <string name="tap_single">Single tap</string>
+    <string name="tap_long">Long press</string>
+    <string name="tap_double">Double tap</string>
+    <string name="tap_triple">Triple tap</string>
+
+    <string name="tap_vol_up_single">Volume Up (Single)</string>
+    <string name="tap_vol_up_long">Volume Up (Long press)</string>
+    <string name="tap_vol_up_double">Volume Up (Double)</string>
+    <string name="tap_vol_up_triple">Volume Up (Triple)</string>
+
+    <string name="tap_vol_down_single">Volume Down (Single)</string>
+    <string name="tap_vol_down_long">Volume Down (Long press)</string>
+    <string name="tap_vol_down_double">Volume Down (Double)</string>
+    <string name="tap_vol_down_triple">Volume Down (Triple)</string>
+
+    <string name="tap_power_long">Power button (long press)</string>
+    <string name="tap_shortcut">Event shortcut</string>
+
+    <string name="section_essential_key">Essential Key</string>
+    <string name="section_volume_up">Volume Up Key</string>
+    <string name="section_volume_down">Volume Down Key</string>
+    <string name="section_power_button">Power Button</string>
+
+    <string name="assistant_permission_title">Assistant Selection</string>
+    <string name="assistant_permission_msg">To intercept long press on the power button, you must select Essent.aI as the default assistant app in system settings.</string>
+    <string name="open_settings_btn">OPEN SETTINGS</string>
+
+    <!-- Controls -->
+    <string name="control_edit">Edit</string>
+    <string name="control_flashlight">Flashlight</string>
+    <string name="control_rotation">Auto-rotation</string>
+    <string name="control_volume">Sound</string>
+    <string name="control_dnd">Do Not Disturb</string>
+    <string name="control_settings">Settings</string>
+    <string name="control_app">App</string>
+    <string name="control_url">Link</string>
+
+    <!-- Macros -->
+    <string name="macro_single">Single</string>
+    <string name="macro_loop">Loop</string>
+
+    <string name="default_action">Default</string>
+    <string name="action_touch">Touch</string>
+    <string name="action_swipe_precise">Precise swipe</string>
+    <string name="action_swipe">Swipe</string>
+    <string name="action_delay">Delay</string>
+    <string name="action_brightness">Brightness</string>
+    <string name="favorites">Favorite apps</string>
+    <string name="control_panel">Control panel</string>
+    <string name="action_home">Home</string>
+    <string name="action_notifications">Notifications</string>
+    <string name="action_flashlight_toggle">Flashlight</string>
+    <string name="action_kill_essential">Close Essential Space</string>
+    <string name="action_kill_notes">Close Notes/Screenshot</string>
+    <string name="action_back">Back</string>
+    <string name="action_glyph">Glyphs</string>
+    <string name="action_screenshot">Screenshot</string>
+    <string name="action_lock_screen">Lock screen</string>
+    <string name="action_split_screen">Split screen</string>
+    <string name="action_volume">Volume</string>
+    <string name="action_media">Media</string>
+    <string name="action_dnd_toggle">Do Not Disturb (on/off)</string>
+    <string name="action_clear_notifications">Clear notifications</string>
+    <string name="action_macro">Macro</string>
+    <string name="action_macro_not_selected">Not selected</string>
+    <string name="action_auto_brightness">Auto brightness</string>
+    <string name="action_url">URL</string>
+    <string name="action_theme">Theme</string>
+    <string name="unit_seconds">sec.</string>
+    <string name="action_glyph_toggle">Glyphs</string>
+    <string name="action_play_glyph_pattern">Play glyph pattern</string>
+    <string name="shortcut_prefix">Shortcut:</string>
+    <string name="assign_action_hint">Assign an action for each physical key press type.</string>
+    <string name="edit_mode">Edit mode</string>
+    <string name="done">DONE</string>
+    <string name="select_app">SELECT APP</string>
+    <string name="enter_url">ENTER LINK</string>
+    <string name="tap_in_cell">TAP A CELL</string>
+    <string name="move">MOVE</string>
+    <string name="add_button">Add button</string>
+    <string name="enter_url_title">Enter URL</string>
+    <string name="cancel">CANCEL</string>
+    <string name="select_app_title">Select app</string>
+    <string name="search_hint">Search…</string>
+    <string name="action_auto_brightness_dots">Auto brightness…</string>
+    <string name="open_app">Open app</string>
+    <string name="action_touch_screen">Screen touch</string>
+    <string name="action_swipe_screen">Screen swipe</string>
+    <string name="action_set_brightness">Set brightness</string>
+    <string name="action_volume_control">Volume control</string>
+    <string name="action_media_control">Media control</string>
+    <string name="action_open_url">Open URL</string>
+    <string name="action_dnd">Do Not Disturb (DND)</string>
+    <string name="action_change_theme">Change theme</string>
+    <string name="events">Events</string>
+    <string name="nav_key">Key</string>
+    <string name="nav_events">Events</string>
+    <string name="nav_macros">Macros</string>
+    <string name="nav_games">Glyph pattern</string>
+    <string name="macro_execution_mode">Execution mode</string>
+    <string name="select_macro">Select macro</string>
+    <string name="macros_empty">Macro list is empty</string>
+
+    <!-- Accessibility -->
+    <string name="accessibility_setup_title">Accessibility Setup</string>
+    <string name="accessibility_permission_required">Permission Required</string>
+    <string name="accessibility_enable_msg">Please enable Essent.aI in Accessibility settings</string>
+
+    <!-- Pickers & Config -->
+    <string name="change_coords">Change coordinates</string>
+    <string name="change_swipe">Change swipe</string>
+    <string name="change_brightness">Change brightness</string>
+    <string name="change_volume">Change volume</string>
+    <string name="change_media">Change media</string>
+    <string name="change_url">Change URL</string>
+    <string name="change_theme">Change theme</string>
+    <string name="select_favorites_title">Select favorite apps</string>
+    <string name="display_settings">Display settings</string>
+    <string name="keep_on_click">Don\'t hide on panel click</string>
+    <string name="keep_on_outside">Don\'t hide on outside click</string>
+    <string name="keep_on_key">Don\'t hide on Essential Key</string>
+    <string name="auto_hide">Automatic hide</string>
+    <string name="never_hide">Never hide</string>
+    <string name="setup_control_panel">Configure control panel</string>
+
+    <!-- States -->
+    <string name="state_off_label">OFF</string>
+    <string name="state_on_label">ON</string>
+    <string name="state_connected">Connected</string>
+    <string name="state_none">None</string>
+    <string name="state_locked">Locked</string>
+    <string name="state_unlocked">Unlocked</string>
+    <string name="state_present">Present</string>
+    <string name="state_moving">Moving</string>
+    <string name="state_still">Still</string>
+    <string name="state_active">Active</string>
+    <string name="state_on_short">ON</string>
+    <string name="state_off_short">OFF</string>
+
+    <!-- Dialogs -->
+    <string name="delete_event_q">Delete event?</string>
+    <string name="delete_event_msg">\"%1$s\" will be deleted permanently.</string>
+    <string name="delete_btn">DELETE</string>
+    <string name="do_not_ask_again">Don\'t ask again</string>
+    <string name="confirm_deletion">Confirm deletion</string>
+    <string name="confirm_deletion_desc">Always ask for confirmation before deleting events or macros.</string>
+
+    <!-- Macro Types -->
+    <string name="macro_type_tap">Single tap</string>
+    <string name="macro_type_swipe">Single swipe</string>
+    <string name="macro_type_combo">Action combination</string>
+    <string name="macro_type_manual">Build from scratch</string>
+    <string name="macros_empty_msg">List is empty. Tap + to create a macro.</string>
+
+    <!-- Macro Editor -->
+    <string name="macro_setup_title">Macro setup</string>
+    <string name="macro_editor_create_collapsed">CREATE MACRO</string>
+    <string name="macro_editor_edit_collapsed">EDIT MACRO</string>
+    <string name="macro_editor_create_expanded">CREATE NEW\nMACRO</string>
+    <string name="macro_editor_edit_expanded">EDIT\nMACRO</string>
+
+    <!-- Groups -->
+    <string name="add_to_group">Add to group</string>
+    <string name="remove_from_group">Remove from group</string>
+    <string name="create_group">Create group</string>
+    <string name="select_group">Select group</string>
+    <string name="group_name">Group name</string>
+    <string name="group_name_hint">Enter group name</string>
+    <string name="add">ADD</string>
+    <string name="create">CREATE</string>
+    <string name="group_empty_msg">No events in this group yet</string>
+    <string name="edit_group">Edit group</string>
+    <string name="delete_group">Delete group</string>
+    <string name="delete_group_q">Delete group?</string>
+    <string name="delete_group_confirm">Events in this group will return to the main list.</string>
+
+    <!-- Batch Selection -->
+    <string name="filter_all">All</string>
+    <string name="filter_in_group">In group</string>
+    <string name="filter_out_group">Outside group</string>
+    <string name="filter_with_badge">With badge</string>
+    <string name="batch_enable">Enable</string>
+    <string name="batch_disable">Disable</string>
+    <string name="batch_add_to_group">To group</string>
+    <string name="batch_remove_from_group">From group</string>
+    <string name="batch_delete">Delete</string>
+    <string name="batch_duplicate">Duplicate</string>
+    <string name="selected_count">Selected: %1$d</string>
+    <string name="delete_selected_q">Delete selected events (%1$d)?</string>
+    <string name="save">SAVE</string>
+    <string name="macro_name_hint">Macro name</string>
+    <string name="macro_actions_label">Macro actions:</string>
+    <string name="add_delay_btn">+DELAY</string>
+    <string name="add_runner_btn">+RUNNER</string>
+    <string name="add_static_btn">+STATIC</string>
+    <string name="add_wave_btn">+WAVE</string>
+    <string name="add_draw_btn">+DRAW</string>
+    <string name="glyph_area_label">Glyph area</string>
+    <string name="glyph_speed_label">Speed</string>
+    <string name="glyph_reverse_label">Reverse direction</string>
+    <string name="glyph_wave_settings">Wave settings</string>
+    <string name="glyph_wave_count">Wave count</string>
+    <string name="glyph_wave_thickness">Wave thickness</string>
+    <string name="glyph_wave_distance">Wave distance</string>
+    <string name="glyph_wave_scope">Affected scope</string>
+    <string name="glyph_wave_scope_all">All zones</string>
+    <string name="glyph_wave_scope_one">Current zone</string>
+    <string name="glyph_draw_title">Create drawing</string>
+    <string name="glyph_select_start_led">Select starting LED</string>
+    <string name="glyph_fade_out">Smooth fade out</string>
+    <string name="glyph_fade_speed">Fade speed</string>
+    <string name="glyph_area_1">Area 1</string>
+    <string name="glyph_area_2">Area 2</string>
+    <string name="glyph_area_3">Area 3</string>
+    <string name="glyph_action_runner">Runner</string>
+    <string name="glyph_action_static">Static</string>
+    <string name="glyph_action_delay">Delay</string>
+    <string name="touch_btn">TOUCH</string>
+    <string name="swipe_btn">SWIPE</string>
+    <string name="delay_btn">DELAY</string>
+    <string name="edit_title">Editing</string>
+    <string name="swipe_convert_msg">Precise swipes cannot be edited visually, but they can be converted to normal swipes (only start and end remain). Are you sure?</string>
+    <string name="convert_btn">CONVERT</string>
+    <string name="no_macros_msg">You don\'t have any macros yet</string>
+
+    <!-- Event Editor -->
+    <string name="event_logic_setup">Logic setup</string>
+    <string name="event_name_shortcut_setup">Name and shortcut</string>
+    <string name="next_btn">NEXT</string>
+    <string name="event_name_hint">Event name</string>
+    <string name="event_shortcut_toggle">Event shortcut confirmation</string>
+    <string name="shortcut_settings">Shortcut settings</string>
+    <string name="delay_before_exec">Delay before execution</string>
+    <string name="event_final_step_desc">In the final step, set the name, icon, and additional behavior parameters.</string>
+    <string name="event_summary_template">When gesture %1$s is performed, then if %2$d conditions are met, %3$s %4$d actions will be performed.</string>
+    <string name="event_shortcut_mid_text">a confirmation shortcut will appear, and after pressing </string>
+    <string name="event_exclusion_template">But if %1$d exclusions are met, the action will not be performed.</string>
+    <string name="when_gesture_exec">When gesture is performed:</string>
+    <string name="if_conditions">If:</string>
+    <string name="add_condition">ADD CONDITION</string>
+    <string name="under_condition">Under condition: </string>
+    <string name="all_and">All at once (AND)</string>
+    <string name="any_or">At least one (OR)</string>
+    <string name="then_actions">Then:</string>
+    <string name="add_action">ADD ACTION</string>
+    <string name="except_exclusions">Except:</string>
+    <string name="add_exclusion">ADD EXCLUSION</string>
+    <string name="always">Always</string>
+    <string name="if_opened_one_of">If one of these is open:</string>
+
+    <!-- Rotations -->
+    <string name="rotation_portrait">Portrait</string>
+    <string name="rotation_face_up">Screen up</string>
+    <string name="rotation_face_down">Screen down</string>
+    <string name="rotation_landscape_left">Landscape (left)</string>
+    <string name="rotation_landscape_right">Landscape (right)</string>
+    <string name="rotation_portrait_desc">Portrait (in hand)</string>
+    <string name="rotation_face_up_desc">Screen up (lying)</string>
+    <string name="rotation_face_down_desc">Screen down (lying)</string>
+    <string name="rotation_landscape_left_desc">Landscape (left)</string>
+    <string name="rotation_landscape_right_desc">Landscape (right)</string>
+    <string name="orientation_label">Orientation: %1$s</string>
+
+    <!-- Light & Ranges -->
+    <string name="light_threshold">Light threshold</string>
+    <string name="light_condition_desc">Condition triggers if light is in range:</string>
+    <string name="light_range_label">Light: from %1$d%% to %2$d%%</string>
+    <string name="range_percent_label">from %1$d%% to %2$d%%</string>
+    <string name="range_condition_desc">Condition triggers in range:</string>
+    <string name="brightness_range_label">Brightness: from %1$s%% to %2$s%%</string>
+    <string name="battery_range_label">Battery: from %1$s%% to %2$s%%</string>
+    <string name="brightness_screen_title">Screen brightness</string>
+    <string name="battery_charge_title">Battery charge</string>
+
+    <!-- Condition Pickers -->
+    <string name="select_condition_title">Select condition</string>
+    <string name="cond_app_label">App is open...</string>
+    <string name="cond_time_label">Time period...</string>
+    <string name="cond_rotation_label">Device orientation...</string>
+    <string name="cond_light_label">Light level...</string>
+    <string name="cond_brightness_label">Screen brightness...</string>
+    <string name="cond_battery_label">Battery charge...</string>
+    <string name="cond_wifi_label">WiFi state...</string>
+    <string name="cond_bt_label">Bluetooth state...</string>
+    <string name="cond_loc_label">Geolocation (GPS)...</string>
+    <string name="cond_data_label">Mobile data...</string>
+    <string name="cond_charging_label">Charging...</string>
+    <string name="cond_lock_label">Screen locked...</string>
+    <string name="cond_airplane_label">Airplane mode...</string>
+    <string name="cond_nfc_label">NFC...</string>
+    <string name="cond_auto_rotate_label">Auto-rotate...</string>
+    <string name="cond_headphones_label">Headphones...</string>
+    <string name="cond_dnd_label">Do Not Disturb...</string>
+    <string name="cond_motion_label">Motion activity...</string>
+    <string name="cond_dark_mode_label">Dark mode...</string>
+    <string name="cond_silent_label">Silent mode...</string>
+    <string name="cond_vibrate_label">Vibrate mode...</string>
+    <string name="cond_hotspot_label">Hotspot...</string>
+
+    <!-- Action Pickers -->
+    <string name="select_action_title">Select action</string>
+    <string name="action_wait_confirmation">Continue on confirmation</string>
+    <string name="action_open_notifications">Open notifications</string>
+
+    <!-- Tabs -->
+    <string name="tab_emojis">Emojis</string>
+    <string name="tab_apps">Apps</string>
+    <string name="tab_symbols">Symbols</string>
+    <string name="symbol_hint">Enter 1-3 symbols</string>
+    <string name="select_btn">SELECT</string>
+
+    <!-- Volume & Media -->
+    <string name="stream_label">Stream:</string>
+    <string name="stream_media">Media</string>
+    <string name="stream_ring">Ring</string>
+    <string name="stream_notif">Notif.</string>
+    <string name="action_label">Action:</string>
+    <string name="action_up">Up</string>
+    <string name="action_down">Down</string>
+    <string name="action_mute">Off</string>
+    <string name="action_set_percent">Set %</string>
+    <string name="media_buttons_title">Media buttons</string>
+    <string name="media_next">Next track</string>
+    <string name="media_prev">Previous track</string>
+    <string name="media_stop">Stop</string>
+    <string name="url_hint">URL (google.com)</string>
+
+    <!-- Themes & Auto Brightness -->
+    <string name="theme_dark_short">Dark</string>
+    <string name="toggle">Toggle</string>
+    <string name="turn_on">Turn on</string>
+    <string name="turn_off">Turn off</string>
+
+    <!-- Time & Touch -->
+    <string name="select_time">Select time</string>
+    <string name="time_from">From:</string>
+    <string name="time_to">To:</string>
+    <string name="touch_picker_hint">Drag circle or tap for hold</string>
+    <string name="swipe_picker_hint">Configure swipe or tap A/B for hold</string>
+    <string name="confirm_btn">CONFIRM</string>
+    <string name="hold_ms_title">Hold (ms)</string>
+
+    <!-- Priority -->
+    <string name="event_priority_title">Event priority</string>
+    <string name="priority_drag_hint">Drag event to change priority (top items are checked first).</string>
+    <string name="revert">Revert</string>
+    <string name="press_single">Single</string>
+    <string name="press_hold">Hold</string>
+    <string name="press_double">Double</string>
+    <string name="press_triple">Triple</string>
+    <string name="slot_single_short">Single</string>
+    <string name="slot_long_short">Hold</string>
+    <string name="slot_double_short">Double</string>
+    <string name="slot_triple_short">Triple</string>
+    <string name="slot_volume_up_short">Vol +</string>
+    <string name="slot_volume_down_short">Vol -</string>
+    <string name="slot_power_long_short">Power</string>
+
+    <!-- Glyph -->
+    <string name="glyph_control_title">Glyph Interface</string>
+    <string name="glyph_permission_msg">Permission to change system settings is required to toggle Glyph Interface.</string>
+    <string name="grant_permission_btn">GRANT PERMISSION</string>
+    <string name="glyph_permission_ok">Permission granted. You can now toggle Glyphs programmatically.</string>
+    <string name="toggle_glyphs_btn">TOGGLE GLYPHS</string>
+    <string name="glyph_runner_btn">GLYPH RUNNER</string>
+
+    <!-- Games & General -->
+    <string name="games_title">Glyph pattern</string>
+    <string name="in_development_msg">This section is under development</string>
+    <string name="events_empty_msg">List is empty. Tap + to add a rule.</string>
+    <string name="add_event">Add event</string>
+    <string name="add_macro">Add macro</string>
+
+    <string name="kill_essential_space">Kill Essential Space</string>
+    <string name="kill_notes">Kill Notes</string>
+    <string name="choose_hide_method_msg">Choose at least one way to hide the shortcut!</string>
+    <string name="copy_suffix"> (copy)</string>
+    <!-- Labels -->
+    <string name="time_label">Time</string>
+    <string name="light_label">Light</string>
+    <string name="brightness_label">Brightness</string>
+    <string name="battery_label">Battery</string>
+    <string name="wifi_label">WiFi</string>
+    <string name="bt_label">Bluetooth</string>
+    <string name="location_label">Location</string>
+    <string name="mobile_data_label">Mobile data</string>
+    <string name="charging_label">Charging</string>
+    <string name="screen_lock_label">Screen</string>
+    <string name="airplane_mode_label">Airplane mode</string>
+    <string name="nfc_label">NFC</string>
+    <string name="auto_rotate_label">Auto-rotate</string>
+    <string name="headphones_label">Headphones</string>
+    <string name="dnd_label">Do Not Disturb</string>
+    <string name="motion_label">Motion</string>
+    <string name="dark_mode_label">Dark mode</string>
+    <string name="silent_mode_label">Silent mode</string>
+    <string name="vibrate_mode_label">Vibrate mode</string>
+    <string name="hotspot_label">Hotspot</string>
+
+    <string name="group_quick_system">⚡ Quick Actions</string>
+    <string name="group_capture_reading">📷 Capture &amp; Reading</string>
+    <string name="group_media">🎵 Sound &amp; Media</string>
+    <string name="group_navigation">🧭 Navigation</string>
+    <string name="group_launch">🚀 Launch &amp; Shortcuts</string>
+    <string name="search_action_hint">Search action</string>
+
+    <string name="action_rotation_lock_title">Rotation Lock</string>
+    <string name="action_ring_vibrate_title">Sound / Vibrate</string>
+    <string name="action_voice_assistant_title">Voice Assistant</string>
+    <string name="action_wake_screen_title">Wake Screen</string>
+    <string name="action_night_light_title">Night Light</string>
+    <string name="action_extra_dim_title">Extra Dim</string>
+    <string name="action_internet_title">Internet (Wi-Fi)</string>
+    <string name="action_bluetooth_title">Bluetooth</string>
+    <string name="action_power_menu_title">Power Menu</string>
+    <string name="action_set_a_timer_title">Set Timer</string>
+    <string name="action_recent_apps_title">Recent apps</string>
+    <string name="action_read_screen_title">Read screen</string>
+    <string name="action_read_aloud_title">Read aloud</string>
+    <string name="action_copy_title">Copy</string>
+    <string name="action_paste_title">Paste</string>
+    <string name="action_calculator_title">Calculator</string>
+    <string name="action_open_camera_title">Open camera</string>
+    <string name="action_screen_recording_title">Screen recording</string>
+    <string name="action_camera_shutter_title">Camera shutter</string>
+    <string name="action_mute_media_title">Mute media</string>
+    <string name="action_quick_settings_title">Quick settings</string>
+    <string name="action_wallet_title">Wallet</string>
+    <string name="action_chatgpt_title">ChatGPT</string>
+    <string name="action_play_pause_title">Play / Pause</string>
+    <string name="action_next_track_title">Next track</string>
+    <string name="action_previous_track_title">Previous track</string>
+    <string name="action_app_shortcut_title">App shortcut</string>
+    <string name="action_clipboard_title">Clipboard Manager</string>
+    <string name="clipboard_empty">Clipboard is empty</string>
+    <string name="clipboard_clear">Clear</string>
+    <string name="clipboard_search_hint">Search clipboard...</string>
+    <string name="copied_to_clipboard">Copied to clipboard</string>
+    <string name="tab_recent">Recent</string>
+    <string name="tab_history">History</string>
+    <string name="tab_favorites">Favorites</string>
+    <string name="menu_copy">Copy</string>
+    <string name="menu_paste">Paste</string>
+    <string name="menu_favorite">Favorite</string>
+    <string name="menu_delete">Delete</string>
+</resources>
