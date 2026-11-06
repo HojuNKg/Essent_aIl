@@ -28,7 +28,28 @@
     <string name="tap_long">Long press</string>
     <string name="tap_double">Double tap</string>
     <string name="tap_triple">Triple tap</string>
+
+    <string name="tap_vol_up_single">Volume Up (Single)</string>
+    <string name="tap_vol_up_long">Volume Up (Long press)</string>
+    <string name="tap_vol_up_double">Volume Up (Double)</string>
+    <string name="tap_vol_up_triple">Volume Up (Triple)</string>
+
+    <string name="tap_vol_down_single">Volume Down (Single)</string>
+    <string name="tap_vol_down_long">Volume Down (Long press)</string>
+    <string name="tap_vol_down_double">Volume Down (Double)</string>
+    <string name="tap_vol_down_triple">Volume Down (Triple)</string>
+
+    <string name="tap_power_long">Power button (long press)</string>
     <string name="tap_shortcut">Event shortcut</string>
+
+    <string name="section_essential_key">Essential Key</string>
+    <string name="section_volume_up">Volume Up Key</string>
+    <string name="section_volume_down">Volume Down Key</string>
+    <string name="section_power_button">Power Button</string>
+
+    <string name="assistant_permission_title">Assistant Selection</string>
+    <string name="assistant_permission_msg">To intercept long press on the power button, you must select Essent.aI as the default assistant app in system settings.</string>
+    <string name="open_settings_btn">OPEN SETTINGS</string>
 
     <!-- Controls -->
     <string name="control_edit">Edit</string>
@@ -54,7 +75,7 @@
     <string name="control_panel">Control panel</string>
     <string name="action_home">Home</string>
     <string name="action_notifications">Notifications</string>
-    <string name="action_flashlight_toggle">Flashlight (on/off)</string>
+    <string name="action_flashlight_toggle">Flashlight</string>
     <string name="action_kill_essential">Close Essential Space</string>
     <string name="action_kill_notes">Close Notes/Screenshot</string>
     <string name="action_back">Back</string>
@@ -72,9 +93,10 @@
     <string name="action_url">URL</string>
     <string name="action_theme">Theme</string>
     <string name="unit_seconds">sec.</string>
-    <string name="action_glyph_toggle">Gliph (on/off)</string>
+    <string name="action_glyph_toggle">Glyphs</string>
+    <string name="action_play_glyph_pattern">Play glyph pattern</string>
     <string name="shortcut_prefix">Shortcut:</string>
-    <string name="assign_action_hint">Assign an action for each Essential key press type.</string>
+    <string name="assign_action_hint">Assign an action for each physical key press type.</string>
     <string name="edit_mode">Edit mode</string>
     <string name="done">DONE</string>
     <string name="select_app">SELECT APP</string>
@@ -100,7 +122,7 @@
     <string name="nav_key">Key</string>
     <string name="nav_events">Events</string>
     <string name="nav_macros">Macros</string>
-    <string name="nav_games">Gliph game</string>
+    <string name="nav_games">Glyph pattern</string>
     <string name="macro_execution_mode">Execution mode</string>
     <string name="select_macro">Select macro</string>
     <string name="macros_empty">Macro list is empty</string>
@@ -145,18 +167,80 @@
     <string name="delete_event_q">Delete event?</string>
     <string name="delete_event_msg">\"%1$s\" will be deleted permanently.</string>
     <string name="delete_btn">DELETE</string>
+    <string name="do_not_ask_again">Don\'t ask again</string>
+    <string name="confirm_deletion">Confirm deletion</string>
+    <string name="confirm_deletion_desc">Always ask for confirmation before deleting events or macros.</string>
 
     <!-- Macro Types -->
     <string name="macro_type_tap">Single tap</string>
     <string name="macro_type_swipe">Single swipe</string>
     <string name="macro_type_combo">Action combination</string>
+    <string name="macro_type_manual">Build from scratch</string>
     <string name="macros_empty_msg">List is empty. Tap + to create a macro.</string>
 
     <!-- Macro Editor -->
     <string name="macro_setup_title">Macro setup</string>
+    <string name="macro_editor_create_collapsed">CREATE MACRO</string>
+    <string name="macro_editor_edit_collapsed">EDIT MACRO</string>
+    <string name="macro_editor_create_expanded">CREATE NEW\nMACRO</string>
+    <string name="macro_editor_edit_expanded">EDIT\nMACRO</string>
+
+    <!-- Groups -->
+    <string name="add_to_group">Add to group</string>
+    <string name="remove_from_group">Remove from group</string>
+    <string name="create_group">Create group</string>
+    <string name="select_group">Select group</string>
+    <string name="group_name">Group name</string>
+    <string name="group_name_hint">Enter group name</string>
+    <string name="add">ADD</string>
+    <string name="create">CREATE</string>
+    <string name="group_empty_msg">No events in this group yet</string>
+    <string name="edit_group">Edit group</string>
+    <string name="delete_group">Delete group</string>
+    <string name="delete_group_q">Delete group?</string>
+    <string name="delete_group_confirm">Events in this group will return to the main list.</string>
+
+    <!-- Batch Selection -->
+    <string name="filter_all">All</string>
+    <string name="filter_in_group">In group</string>
+    <string name="filter_out_group">Outside group</string>
+    <string name="filter_with_badge">With badge</string>
+    <string name="batch_enable">Enable</string>
+    <string name="batch_disable">Disable</string>
+    <string name="batch_add_to_group">To group</string>
+    <string name="batch_remove_from_group">From group</string>
+    <string name="batch_delete">Delete</string>
+    <string name="batch_duplicate">Duplicate</string>
+    <string name="selected_count">Selected: %1$d</string>
+    <string name="delete_selected_q">Delete selected events (%1$d)?</string>
     <string name="save">SAVE</string>
     <string name="macro_name_hint">Macro name</string>
     <string name="macro_actions_label">Macro actions:</string>
+    <string name="add_delay_btn">+DELAY</string>
+    <string name="add_runner_btn">+RUNNER</string>
+    <string name="add_static_btn">+STATIC</string>
+    <string name="add_wave_btn">+WAVE</string>
+    <string name="add_draw_btn">+DRAW</string>
+    <string name="glyph_area_label">Glyph area</string>
+    <string name="glyph_speed_label">Speed</string>
+    <string name="glyph_reverse_label">Reverse direction</string>
+    <string name="glyph_wave_settings">Wave settings</string>
+    <string name="glyph_wave_count">Wave count</string>
+    <string name="glyph_wave_thickness">Wave thickness</string>
+    <string name="glyph_wave_distance">Wave distance</string>
+    <string name="glyph_wave_scope">Affected scope</string>
+    <string name="glyph_wave_scope_all">All zones</string>
+    <string name="glyph_wave_scope_one">Current zone</string>
+    <string name="glyph_draw_title">Create drawing</string>
+    <string name="glyph_select_start_led">Select starting LED</string>
+    <string name="glyph_fade_out">Smooth fade out</string>
+    <string name="glyph_fade_speed">Fade speed</string>
+    <string name="glyph_area_1">Area 1</string>
+    <string name="glyph_area_2">Area 2</string>
+    <string name="glyph_area_3">Area 3</string>
+    <string name="glyph_action_runner">Runner</string>
+    <string name="glyph_action_static">Static</string>
+    <string name="glyph_action_delay">Delay</string>
     <string name="touch_btn">TOUCH</string>
     <string name="swipe_btn">SWIPE</string>
     <string name="delay_btn">DELAY</string>
@@ -285,10 +369,18 @@
     <!-- Priority -->
     <string name="event_priority_title">Event priority</string>
     <string name="priority_drag_hint">Drag event to change priority (top items are checked first).</string>
+    <string name="revert">Revert</string>
+    <string name="press_single">Single</string>
+    <string name="press_hold">Hold</string>
+    <string name="press_double">Double</string>
+    <string name="press_triple">Triple</string>
     <string name="slot_single_short">Single</string>
     <string name="slot_long_short">Hold</string>
     <string name="slot_double_short">Double</string>
     <string name="slot_triple_short">Triple</string>
+    <string name="slot_volume_up_short">Vol +</string>
+    <string name="slot_volume_down_short">Vol -</string>
+    <string name="slot_power_long_short">Power</string>
 
     <!-- Glyph -->
     <string name="glyph_control_title">Glyph Interface</string>
@@ -299,7 +391,7 @@
     <string name="glyph_runner_btn">GLYPH RUNNER</string>
 
     <!-- Games & General -->
-    <string name="games_title">Gliph game</string>
+    <string name="games_title">Glyph pattern</string>
     <string name="in_development_msg">This section is under development</string>
     <string name="events_empty_msg">List is empty. Tap + to add a rule.</string>
     <string name="add_event">Add event</string>
@@ -330,4 +422,51 @@
     <string name="silent_mode_label">Silent mode</string>
     <string name="vibrate_mode_label">Vibrate mode</string>
     <string name="hotspot_label">Hotspot</string>
+
+    <string name="group_quick_system">⚡ Quick Actions</string>
+    <string name="group_capture_reading">📷 Capture &amp; Reading</string>
+    <string name="group_media">🎵 Sound &amp; Media</string>
+    <string name="group_navigation">🧭 Navigation</string>
+    <string name="group_launch">🚀 Launch &amp; Shortcuts</string>
+    <string name="search_action_hint">Search action</string>
+
+    <string name="action_rotation_lock_title">Rotation Lock</string>
+    <string name="action_ring_vibrate_title">Sound / Vibrate</string>
+    <string name="action_voice_assistant_title">Voice Assistant</string>
+    <string name="action_wake_screen_title">Wake Screen</string>
+    <string name="action_night_light_title">Night Light</string>
+    <string name="action_extra_dim_title">Extra Dim</string>
+    <string name="action_internet_title">Internet (Wi-Fi)</string>
+    <string name="action_bluetooth_title">Bluetooth</string>
+    <string name="action_power_menu_title">Power Menu</string>
+    <string name="action_set_a_timer_title">Set Timer</string>
+    <string name="action_recent_apps_title">Recent apps</string>
+    <string name="action_read_screen_title">Read screen</string>
+    <string name="action_read_aloud_title">Read aloud</string>
+    <string name="action_copy_title">Copy</string>
+    <string name="action_paste_title">Paste</string>
+    <string name="action_calculator_title">Calculator</string>
+    <string name="action_open_camera_title">Open camera</string>
+    <string name="action_screen_recording_title">Screen recording</string>
+    <string name="action_camera_shutter_title">Camera shutter</string>
+    <string name="action_mute_media_title">Mute media</string>
+    <string name="action_quick_settings_title">Quick settings</string>
+    <string name="action_wallet_title">Wallet</string>
+    <string name="action_chatgpt_title">ChatGPT</string>
+    <string name="action_play_pause_title">Play / Pause</string>
+    <string name="action_next_track_title">Next track</string>
+    <string name="action_previous_track_title">Previous track</string>
+    <string name="action_app_shortcut_title">App shortcut</string>
+    <string name="action_clipboard_title">Clipboard Manager</string>
+    <string name="clipboard_empty">Clipboard is empty</string>
+    <string name="clipboard_clear">Clear</string>
+    <string name="clipboard_search_hint">Search clipboard...</string>
+    <string name="copied_to_clipboard">Copied to clipboard</string>
+    <string name="tab_recent">Recent</string>
+    <string name="tab_history">History</string>
+    <string name="tab_favorites">Favorites</string>
+    <string name="menu_copy">Copy</string>
+    <string name="menu_paste">Paste</string>
+    <string name="menu_favorite">Favorite</string>
+    <string name="menu_delete">Delete</string>
 </resources>

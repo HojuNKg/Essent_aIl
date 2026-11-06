@@ -24,6 +24,7 @@ import android.util.Log
 import android.view.*
 import android.widget.FrameLayout
 import android.widget.ImageView
+import android.widget.Toast
 import android.view.accessibility.AccessibilityEvent
 import android.telephony.TelephonyManager
 import android.telephony.SubscriptionManager
@@ -38,6 +39,11 @@ import android.net.wifi.WifiManager
 import android.content.res.Configuration
 import androidx.compose.runtime.*
 import androidx.compose.ui.platform.ComposeView
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsAnimationCompat
+import androidx.core.view.WindowInsetsCompat
+import com.HojuNK.essent_all.ui.components.ClipboardOverlayContent
+import com.HojuNK.essent_all.util.EventIconDisplay
 import androidx.lifecycle.Lifecycle
 
 import androidx.lifecycle.LifecycleOwner
@@ -122,13 +128,29 @@ class EssentialKeyService : AccessibilityService(), LifecycleOwner, ViewModelSto
     private val windowManager by lazy { getSystemService(WINDOW_SERVICE) as WindowManager }
     private val states = mutableMapOf<ControlType, Boolean>()
 
-    private var glyphManager: GlyphManager? = null
-    private var glyphOn = false
-    private var glyphRunnerJob: Job? = null
+    private var isClipboardOverlayOpen = false
+    private var wasClipboardOverlayOpenBeforeLock = false
 
     private val stateReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
-            updateStates(); customPanelView?.invalidate()
+            when (intent?.action) {
+                Intent.ACTION_SCREEN_OFF -> {
+                    if (isClipboardOverlayOpen) {
+                        wasClipboardOverlayOpenBeforeLock = true
+                        dismissActivePanel?.invoke()
+                    }
+                }
+                Intent.ACTION_USER_PRESENT -> {
+                    if (wasClipboardOverlayOpenBeforeLock) {
+                        wasClipboardOverlayOpenBeforeLock = false
+                        handler.postDelayed({
+                            showClipboardOverlay()
+                        }, 250)
+                    }
+                }
+            }
+            updateStates()
+            customPanelView?.invalidate()
         }
     }
 
@@ -170,13 +192,169 @@ class EssentialKeyService : AccessibilityService(), LifecycleOwner, ViewModelSto
         }
     }
 
+    private var volUpTapCount = 0
+    private var volDownTapCount = 0
+    private var isVolUpHolding = false
+    private var isVolDownHolding = false
+    private var volUpHoldJob: Job? = null
+    private var volDownHoldJob: Job? = null
+
+    private val resolveVolUpTaps = Runnable {
+        val count = volUpTapCount; volUpTapCount = 0
+        serviceScope.launch {
+            val keyMap = currentKeyMap ?: Config.readBlocking(this@EssentialKeyService)
+            val slot = when (count) { 1 -> TapSlot.VOL_UP_SINGLE; 2 -> TapSlot.VOL_UP_DOUBLE; 3 -> TapSlot.VOL_UP_TRIPLE; else -> null }
+            val target = slot?.let { keyMap.forSlot(it) }
+
+            if (target != null) {
+                dispatch(target, slot)
+            } else {
+                val am = getSystemService(AUDIO_SERVICE) as AudioManager
+                repeat(count) {
+                    am.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_RAISE, AudioManager.FLAG_SHOW_UI)
+                }
+            }
+        }
+    }
+
+    private val resolveVolUpLongPress = Runnable {
+        volUpTapCount = 0
+        handler.removeCallbacks(resolveVolUpTaps)
+        isVolUpHolding = true
+        val keyMap = currentKeyMap ?: Config.readBlocking(this@EssentialKeyService)
+        val target = keyMap.volUpLong
+
+        if (target != null) {
+            dispatch(target, TapSlot.VOL_UP_LONG)
+        } else {
+            volUpHoldJob?.cancel()
+            volUpHoldJob = serviceScope.launch {
+                val am = getSystemService(AUDIO_SERVICE) as AudioManager
+                while (isActive && isVolUpHolding) {
+                    am.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_RAISE, AudioManager.FLAG_SHOW_UI)
+                    delay(150)
+                }
+            }
+        }
+    }
+
+    private val resolveVolDownTaps = Runnable {
+        val count = volDownTapCount; volDownTapCount = 0
+        serviceScope.launch {
+            val keyMap = currentKeyMap ?: Config.readBlocking(this@EssentialKeyService)
+            val slot = when (count) { 1 -> TapSlot.VOL_DOWN_SINGLE; 2 -> TapSlot.VOL_DOWN_DOUBLE; 3 -> TapSlot.VOL_DOWN_TRIPLE; else -> null }
+            val target = slot?.let { keyMap.forSlot(it) }
+
+            if (target != null) {
+                dispatch(target, slot)
+            } else {
+                val am = getSystemService(AUDIO_SERVICE) as AudioManager
+                repeat(count) {
+                    am.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_LOWER, AudioManager.FLAG_SHOW_UI)
+                }
+            }
+        }
+    }
+
+    private val resolveVolDownLongPress = Runnable {
+        volDownTapCount = 0
+        handler.removeCallbacks(resolveVolDownTaps)
+        isVolDownHolding = true
+        val keyMap = currentKeyMap ?: Config.readBlocking(this@EssentialKeyService)
+        val target = keyMap.volDownLong
+
+        if (target != null) {
+            dispatch(target, TapSlot.VOL_DOWN_LONG)
+        } else {
+            volDownHoldJob?.cancel()
+            volDownHoldJob = serviceScope.launch {
+                val am = getSystemService(AUDIO_SERVICE) as AudioManager
+                while (isActive && isVolDownHolding) {
+                    am.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_LOWER, AudioManager.FLAG_SHOW_UI)
+                    delay(150)
+                }
+            }
+        }
+    }
+
     override fun onKeyEvent(event: KeyEvent): Boolean {
         try {
+            val config = currentKeyMap ?: Config.readBlocking(this)
+
+            if (event.keyCode == KeyEvent.KEYCODE_VOLUME_UP) {
+                val hasVolUp = config.hasAnyActionOrEvent(
+                    TapSlot.VOL_UP_SINGLE, TapSlot.VOL_UP_LONG, TapSlot.VOL_UP_DOUBLE, TapSlot.VOL_UP_TRIPLE
+                )
+                if (!hasVolUp) return false // Smart Pass-through: unmapped keys work natively with 0 lag
+
+                val hasMultiTap = config.forSlot(TapSlot.VOL_UP_DOUBLE) != null ||
+                                  config.forSlot(TapSlot.VOL_UP_TRIPLE) != null ||
+                                  config.events.any { it.isEnabled && it.triggerGesture in listOf(TapSlot.VOL_UP_DOUBLE, TapSlot.VOL_UP_TRIPLE) }
+
+                when (event.action) {
+                    KeyEvent.ACTION_DOWN -> {
+                        if (event.repeatCount == 0) {
+                            handler.postDelayed(resolveVolUpLongPress, LONG_PRESS_MS)
+                        }
+                    }
+                    KeyEvent.ACTION_UP -> {
+                        if (isVolUpHolding) {
+                            isVolUpHolding = false
+                            volUpHoldJob?.cancel()
+                        } else if (handler.hasCallbacks(resolveVolUpLongPress)) {
+                            handler.removeCallbacks(resolveVolUpLongPress)
+                            volUpTapCount++
+                            handler.removeCallbacks(resolveVolUpTaps)
+                            if (!hasMultiTap) {
+                                resolveVolUpTaps.run()
+                            } else {
+                                handler.postDelayed(resolveVolUpTaps, TAP_DEBOUNCE_MS)
+                            }
+                        }
+                    }
+                }
+                return true
+            }
+
+            if (event.keyCode == KeyEvent.KEYCODE_VOLUME_DOWN) {
+                val hasVolDown = config.hasAnyActionOrEvent(
+                    TapSlot.VOL_DOWN_SINGLE, TapSlot.VOL_DOWN_LONG, TapSlot.VOL_DOWN_DOUBLE, TapSlot.VOL_DOWN_TRIPLE
+                )
+                if (!hasVolDown) return false // Smart Pass-through
+
+                val hasMultiTap = config.forSlot(TapSlot.VOL_DOWN_DOUBLE) != null ||
+                                  config.forSlot(TapSlot.VOL_DOWN_TRIPLE) != null ||
+                                  config.events.any { it.isEnabled && it.triggerGesture in listOf(TapSlot.VOL_DOWN_DOUBLE, TapSlot.VOL_DOWN_TRIPLE) }
+
+                when (event.action) {
+                    KeyEvent.ACTION_DOWN -> {
+                        if (event.repeatCount == 0) {
+                            handler.postDelayed(resolveVolDownLongPress, LONG_PRESS_MS)
+                        }
+                    }
+                    KeyEvent.ACTION_UP -> {
+                        if (isVolDownHolding) {
+                            isVolDownHolding = false
+                            volDownHoldJob?.cancel()
+                        } else if (handler.hasCallbacks(resolveVolDownLongPress)) {
+                            handler.removeCallbacks(resolveVolDownLongPress)
+                            volDownTapCount++
+                            handler.removeCallbacks(resolveVolDownTaps)
+                            if (!hasMultiTap) {
+                                resolveVolDownTaps.run()
+                            } else {
+                                handler.postDelayed(resolveVolDownTaps, TAP_DEBOUNCE_MS)
+                            }
+                        }
+                    }
+                }
+                return true
+            }
+
             if (event.scanCode != TARGET_SCAN_CODE) {
                 if (event.keyCode == KeyEvent.KEYCODE_BACK && event.action == KeyEvent.ACTION_DOWN) {
                     val currentPanel = customPanelView
                     if (currentPanel != null) {
-                        val config = currentKeyMap ?: Config.readBlocking(this)
                         // Shortcut check
                         val shortcut = activeShortcutEvent ?: pendingShortcutEvent
                         if (shortcut != null) {
@@ -201,7 +379,6 @@ class EssentialKeyService : AccessibilityService(), LifecycleOwner, ViewModelSto
                 KeyEvent.ACTION_DOWN -> {
                     if (event.repeatCount == 0) {
                         // PRE-EMPTIVE FREEZE: Capture screen BEFORE system can react
-                        val config = currentKeyMap ?: Config.readBlocking(this)
                         if (!config.disableAnimations) {
                             showFreezeOverlay(config, isOverride = true)
                         }
@@ -209,8 +386,6 @@ class EssentialKeyService : AccessibilityService(), LifecycleOwner, ViewModelSto
                         // Toggle logic: If a panel is showing, check if we should close it
                         val currentPanel = customPanelView
                         if (currentPanel != null) {
-                            val config = currentKeyMap ?: Config.readBlocking(this)
-                            
                             // Check Shortcut behavior
                             val shortcut = activeShortcutEvent ?: pendingShortcutEvent
                             var shouldClose = false
@@ -296,7 +471,8 @@ class EssentialKeyService : AccessibilityService(), LifecycleOwner, ViewModelSto
             }
 
             val defaultAction = keyMap.forSlot(slot)
-            val isOverrideAction = isMacroActive || (activePanelSlot != null) || matchedRules.isNotEmpty() || defaultAction != null || target != null
+            val hasUserActionOrEvent = (defaultAction != null) || matchedRules.isNotEmpty() || (target != null)
+            val isOverrideAction = isMacroActive || (activePanelSlot != null) || hasUserActionOrEvent
             
             // Show magic freeze overlay if animations are not disabled
             if (!keyMap.disableAnimations) {
@@ -304,7 +480,7 @@ class EssentialKeyService : AccessibilityService(), LifecycleOwner, ViewModelSto
             }
 
             // 2. Execution Logic
-            if (isMacroActive) {
+            if (isMacroActive && !hasUserActionOrEvent) {
                 Log.d(TAG, "Stopping active macro")
                 macroJob?.cancel()
                 isMacroActive = false
@@ -315,7 +491,7 @@ class EssentialKeyService : AccessibilityService(), LifecycleOwner, ViewModelSto
                 return
             }
 
-            if (activePanelSlot != null || panelClosedByKey) {
+            if ((activePanelSlot != null || panelClosedByKey) && !hasUserActionOrEvent) {
                 val custom = activePanelSlot?.let { keyMap.customConfigs[it] }
                 val shortcut = activeShortcutEvent ?: pendingShortcutEvent
                 
@@ -624,14 +800,32 @@ class EssentialKeyService : AccessibilityService(), LifecycleOwner, ViewModelSto
         val isApp = !target.startsWith("action:")
         val needsKill = isApp || 
                          target == Config.ACTION_FLASHLIGHT || 
+                         target.startsWith(Config.ACTION_FLASHLIGHT_PREFIX) ||
                          target == Config.ACTION_BACK || 
                          target == Config.ACTION_HOME || 
                          target == Config.ACTION_NOTIFICATIONS ||
+                         target == Config.ACTION_RECENTS ||
+                         target == Config.ACTION_QUICK_SETTINGS ||
+                         target == Config.ACTION_POWER_MENU ||
+                         target == Config.ACTION_ROTATION_TOGGLE ||
+                         target == Config.ACTION_RING_VIBRATE ||
+                         target == Config.ACTION_WIFI_TOGGLE ||
+                         target == Config.ACTION_BLUETOOTH_TOGGLE ||
+                         target == Config.ACTION_CALCULATOR ||
+                         target == Config.ACTION_OPEN_CAMERA ||
+                         target == Config.ACTION_CAMERA_SHUTTER ||
+                         target == Config.ACTION_EXTRA_DIM ||
                          target.startsWith(Config.ACTION_BRIGHTNESS_PREFIX) ||
                          target == Config.ACTION_CONTROLS ||
                          target == Config.ACTION_FAVORITES_PREFIX ||
                          target == Config.ACTION_GLYPH ||
                          target == Config.ACTION_GLYPH_TOGGLE ||
+                         target.startsWith(Config.ACTION_GLYPH_PREFIX) ||
+                         target.startsWith(Config.ACTION_GLYPH_PATTERN_PREFIX) ||
+                         target.startsWith(Config.ACTION_GLYPH_STATIC_PREFIX) ||
+                         target.startsWith(Config.ACTION_GLYPH_WAVE_PREFIX) ||
+                         target.startsWith(Config.ACTION_GLYPH_DRAW_PREFIX) ||
+                         target.startsWith(Config.ACTION_GLYPH_STEP_RUNNER_PREFIX) ||
                          target.startsWith(Config.ACTION_MACRO_PREFIX) ||
                          target == Config.ACTION_SCREENSHOT ||
                          target == Config.ACTION_LOCK_SCREEN ||
@@ -643,7 +837,8 @@ class EssentialKeyService : AccessibilityService(), LifecycleOwner, ViewModelSto
                          target.startsWith(Config.ACTION_URL_PREFIX) ||
                          target.startsWith(Config.ACTION_THEME_PREFIX)
 
-        if (needsKill && !isKillModeActive && !isMacroActive) {
+        val isEssentialKey = slot == TapSlot.SINGLE || slot == TapSlot.LONG || slot == TapSlot.DOUBLE || slot == TapSlot.TRIPLE
+        if (needsKill && isEssentialKey && !isKillModeActive && !isMacroActive) {
             val killCount = if (slot == TapSlot.SINGLE || slot == TapSlot.LONG) {
                 if (slot == TapSlot.LONG) 2 else 1
             } else 1
@@ -681,6 +876,30 @@ class EssentialKeyService : AccessibilityService(), LifecycleOwner, ViewModelSto
                 showFavoritesRoller(currentKeyMap ?: Config.readBlocking(this), (currentKeyMap?.customConfigs?.get(slot) ?: CustomConfig()), slot)
                 return
             }
+            target == Config.ACTION_FLASHLIGHT || target.startsWith(Config.ACTION_FLASHLIGHT_PREFIX) -> {
+                handleFlashlightAction(target)
+                return
+            }
+            target == Config.ACTION_GLYPH || target == Config.ACTION_GLYPH_TOGGLE || target.startsWith(Config.ACTION_GLYPH_PREFIX) -> {
+                handleGlyphAction(target)
+                return
+            }
+            target.startsWith(Config.ACTION_GLYPH_PATTERN_PREFIX) -> {
+                val patternId = target.removePrefix(Config.ACTION_GLYPH_PATTERN_PREFIX)
+                val config = currentKeyMap ?: Config.readBlocking(this)
+                val pattern = config.glyphPatterns.find { it.id == patternId }
+                if (pattern != null) {
+                    com.HojuNK.essent_all.util.GlyphController.playGlyphPattern(pattern)
+                }
+                return
+            }
+            target.startsWith(Config.ACTION_GLYPH_STATIC_PREFIX) ||
+            target.startsWith(Config.ACTION_GLYPH_WAVE_PREFIX) ||
+            target.startsWith(Config.ACTION_GLYPH_DRAW_PREFIX) ||
+            target.startsWith(Config.ACTION_GLYPH_STEP_RUNNER_PREFIX) -> {
+                com.HojuNK.essent_all.util.GlyphController.playGlyphPattern(Macro(id = "temp", icon = "", title = "Temp", actions = listOf(target)))
+                return
+            }
             target.startsWith(Config.ACTION_MACRO_PREFIX) -> {
                 val id = target.removePrefix(Config.ACTION_MACRO_PREFIX)
                 val config = currentKeyMap ?: Config.readBlocking(this)
@@ -710,12 +929,12 @@ class EssentialKeyService : AccessibilityService(), LifecycleOwner, ViewModelSto
         }
         
         when (target) {
-            Config.ACTION_FLASHLIGHT -> toggleTorch()
-            Config.ACTION_GLYPH -> toggleGlyph()
-            Config.ACTION_GLYPH_TOGGLE -> toggleGlyph()
             Config.ACTION_BACK -> performGlobalAction(GLOBAL_ACTION_BACK)
             Config.ACTION_HOME -> performGlobalAction(GLOBAL_ACTION_HOME)
             Config.ACTION_NOTIFICATIONS -> performGlobalAction(GLOBAL_ACTION_NOTIFICATIONS)
+            Config.ACTION_RECENTS -> performGlobalAction(GLOBAL_ACTION_RECENTS)
+            Config.ACTION_QUICK_SETTINGS -> performGlobalAction(GLOBAL_ACTION_QUICK_SETTINGS)
+            Config.ACTION_POWER_MENU -> performGlobalAction(GLOBAL_ACTION_POWER_DIALOG)
             Config.ACTION_SCREENSHOT -> performGlobalAction(GLOBAL_ACTION_TAKE_SCREENSHOT)
             Config.ACTION_LOCK_SCREEN -> performGlobalAction(GLOBAL_ACTION_LOCK_SCREEN)
             Config.ACTION_SPLIT_SCREEN -> {
@@ -727,6 +946,82 @@ class EssentialKeyService : AccessibilityService(), LifecycleOwner, ViewModelSto
                 }
             }
             Config.ACTION_DND_TOGGLE -> toggleDnd()
+            Config.ACTION_ROTATION_TOGGLE -> {
+                try {
+                    val current = Settings.System.getInt(contentResolver, Settings.System.ACCELEROMETER_ROTATION, 0)
+                    val next = if (current == 1) 0 else 1
+                    if (Settings.System.canWrite(this)) {
+                        Settings.System.putInt(contentResolver, Settings.System.ACCELEROMETER_ROTATION, next)
+                    } else {
+                        val intent = Intent(Settings.ACTION_MANAGE_WRITE_SETTINGS, Uri.parse("package:$packageName")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        startActivity(intent)
+                    }
+                } catch (e: Exception) {}
+            }
+            Config.ACTION_RING_VIBRATE -> {
+                try {
+                    val am = getSystemService(AUDIO_SERVICE) as AudioManager
+                    val mode = am.ringerMode
+                    val next = when (mode) {
+                        AudioManager.RINGER_MODE_NORMAL -> AudioManager.RINGER_MODE_VIBRATE
+                        AudioManager.RINGER_MODE_VIBRATE -> AudioManager.RINGER_MODE_SILENT
+                        else -> AudioManager.RINGER_MODE_NORMAL
+                    }
+                    am.ringerMode = next
+                } catch (e: Exception) {}
+            }
+            Config.ACTION_WIFI_TOGGLE -> {
+                try {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        val intent = Intent(Settings.Panel.ACTION_INTERNET_CONNECTIVITY).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        startActivity(intent)
+                    } else {
+                        val wm = getSystemService(WIFI_SERVICE) as WifiManager
+                        @Suppress("DEPRECATION")
+                        wm.isWifiEnabled = !wm.isWifiEnabled
+                    }
+                } catch (e: Exception) {
+                    val intent = Intent(Settings.ACTION_WIFI_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    startActivity(intent)
+                }
+            }
+            Config.ACTION_BLUETOOTH_TOGGLE -> {
+                try {
+                    val intent = Intent(Settings.ACTION_BLUETOOTH_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    startActivity(intent)
+                } catch (e: Exception) {}
+            }
+            Config.ACTION_CALCULATOR -> {
+                try {
+                    val intent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_APP_CALCULATOR).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    startActivity(intent)
+                } catch (e: Exception) {
+                    try {
+                        val intent = packageManager.getLaunchIntentForPackage("com.google.android.calculator") ?: packageManager.getLaunchIntentForPackage("com.android.calculator2")
+                        if (intent != null) startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                    } catch (ex: Exception) {}
+                }
+            }
+            Config.ACTION_OPEN_CAMERA -> {
+                try {
+                    val intent = Intent(android.provider.MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    startActivity(intent)
+                } catch (e: Exception) {}
+            }
+            Config.ACTION_CAMERA_SHUTTER -> {
+                try {
+                    val am = getSystemService(AUDIO_SERVICE) as AudioManager
+                    am.dispatchMediaKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_CAMERA))
+                    am.dispatchMediaKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_CAMERA))
+                } catch (e: Exception) {}
+            }
+            Config.ACTION_EXTRA_DIM -> {
+                try {
+                    val intent = Intent(Settings.ACTION_DISPLAY_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    startActivity(intent)
+                } catch (e: Exception) {}
+            }
+            Config.ACTION_CLIPBOARD -> showClipboardOverlay()
             Config.ACTION_CLEAR_NOTIFICATIONS -> clearAllNotifications()
             Config.ACTION_KILL_ESSENTIAL -> setupKill(1, false, slot)
             Config.ACTION_KILL_NOTES -> setupKill(slot.let { if (it == TapSlot.LONG) 2 else 1 }, false, slot)
@@ -1194,64 +1489,11 @@ class EssentialKeyService : AccessibilityService(), LifecycleOwner, ViewModelSto
     }
 
     private fun toggleGlyph() {
-        try {
-            stopGlyphRunner() // Останавливаем бегунок, если он активен
-            if (!glyphOn) {
-                val builder = glyphManager?.getGlyphFrameBuilder() ?: return
-                builder.buildChannelA()
-                builder.buildChannelB()
-                builder.buildChannelC()
-                glyphManager?.toggle(builder.build())
-                glyphOn = true
-                Log.d(TAG, "Glyph Channels A, B, C turned ON")
-            } else {
-                glyphManager?.turnOff()
-                glyphOn = false
-                Log.d(TAG, "Glyph turned OFF")
-            }
-        } catch (e: GlyphException) {
-            Log.e(TAG, "Failed to toggle glyph: ${e.message}")
-        } catch (e: Exception) {
-            Log.e(TAG, "General error in toggleGlyph: ${e.message}")
-        }
+        com.HojuNK.essent_all.util.GlyphController.toggleGlyph()
     }
 
     private fun toggleGlyphRunner() {
-        if (glyphRunnerJob != null) {
-            stopGlyphRunner()
-        } else {
-            glyphOn = false // Сбрасываем флаг обычного включения
-            glyphManager?.turnOff()
-            
-            glyphRunnerJob = serviceScope.launch {
-                Log.d(TAG, "Glyph Runner started")
-                val allIndices = (0..35).toList() // Полный круг из всех зон
-                var currentPos = 0
-                
-                try {
-                    while (isActive) {
-                        val builder = glyphManager?.getGlyphFrameBuilder() ?: break
-                        // Включаем только один светодиод
-                        builder.buildChannel(allIndices[currentPos])
-                        glyphManager?.toggle(builder.build())
-                        
-                        currentPos = (currentPos + 1) % allIndices.size
-                        delay(100) // Скорость бегунка
-                    }
-                } catch (e: Exception) {
-                    Log.e(TAG, "Glyph Runner error: ${e.message}")
-                } finally {
-                    glyphManager?.turnOff()
-                }
-            }
-        }
-    }
-
-    private fun stopGlyphRunner() {
-        glyphRunnerJob?.cancel()
-        glyphRunnerJob = null
-        glyphManager?.turnOff()
-        Log.d(TAG, "Glyph Runner stopped")
+        com.HojuNK.essent_all.util.GlyphController.toggleGlyphRunner()
     }
 
     private fun setSystemBrightness(percent: Int) {
@@ -1966,6 +2208,39 @@ class EssentialKeyService : AccessibilityService(), LifecycleOwner, ViewModelSto
     }
 
     private fun findTorchCameraId(): String? = try { cameraManager.cameraIdList.firstOrNull { id -> cameraManager.getCameraCharacteristics(id).get(CameraCharacteristics.FLASH_INFO_AVAILABLE) == true } } catch (e: Exception) { null }
+    private fun handleFlashlightAction(action: String) {
+        val id = torchCameraId ?: return
+        val mode = if (action.startsWith(Config.ACTION_FLASHLIGHT_PREFIX)) {
+            action.removePrefix(Config.ACTION_FLASHLIGHT_PREFIX)
+        } else {
+            "toggle"
+        }
+        try {
+            val next = when (mode) {
+                "on" -> true
+                "off" -> false
+                else -> !torchOn
+            }
+            cameraManager.setTorchMode(id, next)
+            torchOn = next
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to handle flashlight action: ${e.message}")
+        }
+    }
+
+    private fun handleGlyphAction(action: String) {
+        val mode = if (action.startsWith(Config.ACTION_GLYPH_PREFIX)) {
+            action.removePrefix(Config.ACTION_GLYPH_PREFIX)
+        } else {
+            "toggle"
+        }
+        when (mode) {
+            "on" -> com.HojuNK.essent_all.util.GlyphController.turnOnGlyphs()
+            "off" -> com.HojuNK.essent_all.util.GlyphController.turnOffGlyphs()
+            else -> com.HojuNK.essent_all.util.GlyphController.toggleGlyph()
+        }
+    }
+
     private fun toggleTorch() { val id = torchCameraId ?: return; try { val next = !torchOn; cameraManager.setTorchMode(id, next); torchOn = next } catch (e: Exception) {} }
 
     private fun showFreezeOverlay(keyMap: KeyMap, isOverride: Boolean) {
@@ -2103,6 +2378,172 @@ class EssentialKeyService : AccessibilityService(), LifecycleOwner, ViewModelSto
         }
     }
 
+    private fun pasteTextToActiveField(text: String) {
+        try {
+            val cm = getSystemService(CLIPBOARD_SERVICE) as? ClipboardManager
+            cm?.setPrimaryClip(ClipData.newPlainText("EssentAI Paste", text))
+            Toast.makeText(this, "Скопировано в буфер", Toast.LENGTH_SHORT).show()
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to paste text", e)
+        }
+    }
+
+    private fun showClipboardOverlay() {
+        dismissActivePanel?.invoke()
+        try {
+            ClipboardHistoryManager.syncSystemClipboard(this)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to read clipboard on overlay open", e)
+        }
+
+        isClipboardOverlayOpen = true
+        val isLocked = getIsScreenLocked()
+        val activePkg = rootInActiveWindow?.packageName?.toString() ?: currentPackage
+
+        lateinit var composeView: ComposeView
+
+        val params = WindowManager.LayoutParams(
+            WindowManager.LayoutParams.MATCH_PARENT,
+            WindowManager.LayoutParams.MATCH_PARENT,
+            WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
+            WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH,
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
+            softInputMode = WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
+        }
+
+        composeView = ComposeView(this).apply {
+            setViewTreeLifecycleOwner(this@EssentialKeyService)
+            setViewTreeViewModelStoreOwner(this@EssentialKeyService)
+            setViewTreeSavedStateRegistryOwner(this@EssentialKeyService)
+
+            setOnTouchListener { _, event ->
+                if (event.action == MotionEvent.ACTION_OUTSIDE) {
+                    // Always pinned: do not dismiss on outside touch
+                    true
+                } else false
+            }
+
+            setContent {
+                ClipboardOverlayContent(
+                    isScreenLocked = isLocked,
+                    activePackageName = activePkg,
+                    onDismiss = { dismissActivePanel?.invoke() },
+                    onPasteItem = { text ->
+                        pasteTextToActiveField(text)
+                        dismissActivePanel?.invoke()
+                    },
+                    onHeightChanged = { newHeightPx ->
+                        if (params.height != newHeightPx) {
+                            params.height = newHeightPx
+                            try {
+                                windowManager.updateViewLayout(composeView, params)
+                            } catch (e: Exception) {}
+                        }
+                    },
+                    onKeyboardFocusRequested = { needsFocus ->
+                        if (needsFocus) {
+                            params.flags = params.flags and WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE.inv()
+                        } else {
+                            params.flags = params.flags or WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+                        }
+                        try {
+                            windowManager.updateViewLayout(composeView, params)
+                        } catch (e: Exception) {}
+                    },
+                    onToggleCustomizableMode = { active ->
+                        if (active) {
+                            params.gravity = Gravity.TOP or Gravity.START
+                        } else {
+                            params.gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
+                        }
+                        try {
+                            windowManager.updateViewLayout(composeView, params)
+                        } catch (e: Exception) {}
+                    },
+                    onMoveOverlay = { dx, dy ->
+                        params.gravity = Gravity.TOP or Gravity.START
+                        params.x += dx.toInt()
+                        params.y += dy.toInt()
+                        try {
+                            windowManager.updateViewLayout(composeView, params)
+                        } catch (e: Exception) {}
+                    },
+                    onResizeCorner = { dw, dh, corner ->
+                        params.gravity = Gravity.TOP or Gravity.START
+                        val newWidth = (params.width + dw.toInt()).coerceAtLeast(200)
+                        val newHeight = (params.height + dh.toInt()).coerceAtLeast(150)
+                        if (corner == "TOP_LEFT") {
+                            params.x -= (newWidth - params.width)
+                            params.y -= (newHeight - params.height)
+                        } else if (corner == "TOP_RIGHT") {
+                            params.y -= (newHeight - params.height)
+                        } else if (corner == "BOTTOM_LEFT") {
+                            params.x -= (newWidth - params.width)
+                        }
+                        params.width = newWidth
+                        params.height = newHeight
+                        try {
+                            windowManager.updateViewLayout(composeView, params)
+                        } catch (e: Exception) {}
+                    },
+                    onSaveCustomLayout = {
+                        try {
+                            windowManager.updateViewLayout(composeView, params)
+                        } catch (e: Exception) {}
+                    },
+                    onResetCustomLayout = {
+                        params.gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
+                        params.width = WindowManager.LayoutParams.MATCH_PARENT
+                        params.height = WindowManager.LayoutParams.MATCH_PARENT
+                        params.x = 0
+                        params.y = 0
+                        try {
+                            windowManager.updateViewLayout(composeView, params)
+                        } catch (e: Exception) {}
+                    }
+                )
+            }
+        }
+
+        val closePanel: () -> Unit = {
+            try {
+                isClipboardOverlayOpen = false
+                windowManager.removeView(composeView)
+                customPanelView = null
+                activePanelSlot = null
+                dismissActivePanel = null
+
+                val shortcutEv = activeShortcutEvent
+                if (shortcutEv != null && shortcutEv.keepVisibleOnClick) {
+                    val slot = triggeredBySlot ?: TapSlot.SINGLE
+                    handler.post {
+                        showShortcutPanel(
+                            shortcutEv,
+                            slot,
+                            keepClick = true,
+                            keepOutside = shortcutEv.keepVisibleOnOutsideClick,
+                            keepKey = shortcutEv.keepVisibleOnKey,
+                            autoHide = shortcutEv.autoHideSeconds
+                        )
+                    }
+                } else {
+                    activeShortcutEvent = null
+                    triggeredBySlot = null
+                }
+            } catch (e: Exception) {}
+        }
+
+        dismissActivePanel = closePanel
+
+        try {
+            windowManager.addView(composeView, params)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to show clipboard overlay", e)
+        }
+    }
+
     private fun dissolveFreezeOverlay(view: View) {
         if (freezeOverlayView == view) {
             view.animate()
@@ -2122,33 +2563,25 @@ class EssentialKeyService : AccessibilityService(), LifecycleOwner, ViewModelSto
         }
     }
 
+    override fun onCreate() {
+        super.onCreate()
+        instance = this
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        if (instance == this) instance = null
+    }
+
     override fun onServiceConnected() {
         super.onServiceConnected(); 
+        instance = this
         isAccessibilityConnected = true
+        com.HojuNK.essent_all.util.GlyphController.init(this)
         
         val info = serviceInfo
         info.flags = info.flags or android.accessibilityservice.AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS
         serviceInfo = info
-
-        Log.d(TAG, "Initializing Nothing SDK for Phone 3a...")
-        glyphManager = GlyphManager.getInstance(this)
-        glyphManager?.init(object : GlyphManager.Callback {
-            override fun onServiceConnected(componentName: ComponentName) {
-                Log.i(TAG, "GlyphManager service connected!")
-                if (Common.is24111()) {
-                    glyphManager?.register(Glyph.DEVICE_24111)
-                }
-                try {
-                    glyphManager?.openSession()
-                } catch (e: Exception) {
-                    Log.e(TAG, "Glyph session error: ${e.message}")
-                }
-            }
-            override fun onServiceDisconnected(componentName: ComponentName) {
-                Log.w(TAG, "GlyphManager service disconnected")
-                glyphManager?.closeSession()
-            }
-        })
         
         serviceScope.launch {
             Config.flow(this@EssentialKeyService).collect { keyMap ->
@@ -2162,6 +2595,8 @@ class EssentialKeyService : AccessibilityService(), LifecycleOwner, ViewModelSto
         val filter = IntentFilter().apply { 
             addAction(Intent.ACTION_AIRPLANE_MODE_CHANGED)
             addAction(AudioManager.RINGER_MODE_CHANGED_ACTION) 
+            addAction(Intent.ACTION_SCREEN_OFF)
+            addAction(Intent.ACTION_USER_PRESENT)
         }
         registerReceiver(stateReceiver, filter)
         savedStateRegistryController.performRestore(null)
@@ -2186,10 +2621,9 @@ class EssentialKeyService : AccessibilityService(), LifecycleOwner, ViewModelSto
     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
 
     override fun onUnbind(intent: Intent?): Boolean { 
+        if (instance == this) instance = null
         isAccessibilityConnected = false
         serviceScope.cancel()
-        glyphManager?.closeSession()
-        glyphManager?.unInit()
         cameraManager.unregisterTorchCallback(torchCallback)
         sensorManager.unregisterListener(this)
         try { unregisterReceiver(stateReceiver) } catch (e: Exception) {}
@@ -2200,7 +2634,17 @@ class EssentialKeyService : AccessibilityService(), LifecycleOwner, ViewModelSto
     }
 
     companion object {
-        const val TAG = "EMAP"; const val TARGET_SCAN_CODE = 250; const val TAP_DEBOUNCE_MS = 400L; const val LONG_PRESS_MS = 500L
-        private val TARGET_PACKAGES = setOf("com.nothing.ntessentialrecorder", "com.nothing.ntessentialspace", "com.nothing.essentialintelligence.extradark.overlay", "com.nothing.ntessentialrecorder.extradark.overlay", "com.nothing.ntessentialspace.extradark.overlay", "com.nothing.ntessentialspace.overlay.all_devices", "com.nothing.ntessentialspace.overlay.asteroids")
+        const val TAG = "EMAP"; const val TARGET_SCAN_CODE = 250; const val TAP_DEBOUNCE_MS = 900L; const val LONG_PRESS_MS = 500L
+        private val TARGET_PACKAGES = setOf("com.nothing.ntessentialrecorder", "com.nothing.ntessentialspace", "com.nothing.essentialintelligence.extradark.overlay", "com.nothing.ntessentialrecorder.extradark.overlay", "com.nothing.ntessentialspace.extradark.overlay", "com.nothing.ntessentialspace.overlay.overlay.all_devices", "com.nothing.ntessentialspace.overlay.asteroids")
+        var instance: EssentialKeyService? = null
+            private set
+
+        fun triggerPowerLongAction(context: Context) {
+            instance?.let { service ->
+                val config = service.currentKeyMap ?: Config.readBlocking(service)
+                val action = config.powerLong ?: Config.ACTION_POWER_MENU
+                service.dispatch(action, TapSlot.POWER_LONG)
+            }
+        }
     }
 }

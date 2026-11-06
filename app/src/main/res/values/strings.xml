@@ -28,7 +28,28 @@
     <string name="tap_long">Долгое нажатие</string>
     <string name="tap_double">Двойное нажатие</string>
     <string name="tap_triple">Тройное нажатие</string>
+
+    <string name="tap_vol_up_single">Громкость + (Одинарное)</string>
+    <string name="tap_vol_up_long">Громкость + (Удержание)</string>
+    <string name="tap_vol_up_double">Громкость + (Двойное)</string>
+    <string name="tap_vol_up_triple">Громкость + (Тройное)</string>
+
+    <string name="tap_vol_down_single">Громкость - (Одинарное)</string>
+    <string name="tap_vol_down_long">Громкость - (Удержание)</string>
+    <string name="tap_vol_down_double">Громкость - (Двойное)</string>
+    <string name="tap_vol_down_triple">Громкость - (Тройное)</string>
+
+    <string name="tap_power_long">Кнопка питания (удержание)</string>
     <string name="tap_shortcut">Ярлык ивента</string>
+
+    <string name="section_essential_key">Essential Key</string>
+    <string name="section_volume_up">Клавиша громкости +</string>
+    <string name="section_volume_down">Клавиша громкости -</string>
+    <string name="section_power_button">Кнопка питания</string>
+
+    <string name="assistant_permission_title">Выбор ассистента</string>
+    <string name="assistant_permission_msg">Чтобы перехватить удержание кнопки питания, необходимо выбрать Essent.aI в качестве ассистента по умолчанию в настройках системы.</string>
+    <string name="open_settings_btn">ОТКРЫТЬ НАСТРОЙКИ</string>
 
     <!-- Controls -->
     <string name="control_edit">Редактировать</string>
@@ -54,7 +75,7 @@
     <string name="control_panel">Панель управления</string>
     <string name="action_home">Домой</string>
     <string name="action_notifications">Уведомления</string>
-    <string name="action_flashlight_toggle">Фонарик (вкл/выкл)</string>
+    <string name="action_flashlight_toggle">Фонарик</string>
     <string name="action_kill_essential">Закрыть Essential Space</string>
     <string name="action_kill_notes">Закрыть Заметки/Скриншот</string>
     <string name="action_back">Назад</string>
@@ -72,9 +93,10 @@
     <string name="action_url">URL</string>
     <string name="action_theme">Тема</string>
     <string name="unit_seconds">сек.</string>
-    <string name="action_glyph_toggle">Gliph (вкл/выкл)</string>
+    <string name="action_glyph_toggle">Глифы</string>
+    <string name="action_play_glyph_pattern">Проиграть глиф узор</string>
     <string name="shortcut_prefix">Ярлык:</string>
-    <string name="assign_action_hint">Назначьте действие для каждого типа нажатия клавиши Essential.</string>
+    <string name="assign_action_hint">Назначьте действие для каждого типа нажатий физических клавиш.</string>
     <string name="edit_mode">Редактирование</string>
     <string name="done">ГОТОВО</string>
     <string name="select_app">ВЫБРАТЬ ПРИЛОЖЕНИЕ</string>
@@ -100,7 +122,7 @@
     <string name="nav_key">Кнопка</string>
     <string name="nav_events">Ивенты</string>
     <string name="nav_macros">Макросы</string>
-    <string name="nav_games">Глиф игра</string>
+    <string name="nav_games">Глиф узор</string>
     <string name="macro_execution_mode">Режим выполнения</string>
     <string name="select_macro">Выберите макрос</string>
     <string name="macros_empty">Список макросов пуст</string>
@@ -145,18 +167,80 @@
     <string name="delete_event_q">Удалить ивент?</string>
     <string name="delete_event_msg">\"%1$s\" будет удален безвозвратно.</string>
     <string name="delete_btn">УДАЛИТЬ</string>
+    <string name="do_not_ask_again">Больше не спрашивать</string>
+    <string name="confirm_deletion">Подтверждать удаление</string>
+    <string name="confirm_deletion_desc">Всегда спрашивать подтверждение перед удалением ивентов или макросов.</string>
 
     <!-- Macro Types -->
     <string name="macro_type_tap">Одиночное касание</string>
     <string name="macro_type_swipe">Одиночный свайп</string>
     <string name="macro_type_combo">Комбинация действий</string>
+    <string name="macro_type_manual">Собрать с нуля</string>
     <string name="macros_empty_msg">Список пуст. Нажмите +, чтобы создать макрос.</string>
 
     <!-- Macro Editor -->
     <string name="macro_setup_title">Настройка макроса</string>
+    <string name="macro_editor_create_collapsed">СОЗДАЕМ МАКРОС</string>
+    <string name="macro_editor_edit_collapsed">РЕДАКТИРУЕМ МАКРОС</string>
+    <string name="macro_editor_create_expanded">СОЗДАЕМ НОВЫЙ\nМАКРОС</string>
+    <string name="macro_editor_edit_expanded">РЕДАКТИРУЕМ\nМАКРОС</string>
+
+    <!-- Groups -->
+    <string name="add_to_group">Добавить в группу</string>
+    <string name="remove_from_group">Исключить из группы</string>
+    <string name="create_group">Создать группу</string>
+    <string name="select_group">Выбор группы</string>
+    <string name="group_name">Название группы</string>
+    <string name="group_name_hint">Введите название</string>
+    <string name="add">ДОБАВИТЬ</string>
+    <string name="create">СОЗДАТЬ</string>
+    <string name="group_empty_msg">В этой группе пока нет ивентов</string>
+    <string name="edit_group">Редактировать группу</string>
+    <string name="delete_group">Удалить группу</string>
+    <string name="delete_group_q">Удалить группу?</string>
+    <string name="delete_group_confirm">Ивенты из этой группы вернутся в общий список.</string>
+
+    <!-- Batch Selection -->
+    <string name="filter_all">Все</string>
+    <string name="filter_in_group">В группе</string>
+    <string name="filter_out_group">Вне группы</string>
+    <string name="filter_with_badge">С ярлыком</string>
+    <string name="batch_enable">Вкл</string>
+    <string name="batch_disable">Выкл</string>
+    <string name="batch_add_to_group">В группу</string>
+    <string name="batch_remove_from_group">Из группы</string>
+    <string name="batch_delete">Удалить</string>
+    <string name="batch_duplicate">Копировать</string>
+    <string name="selected_count">Выбрано: %1$d</string>
+    <string name="delete_selected_q">Удалить выбранные ивенты (%1$d)?</string>
     <string name="save">СОХРАНИТЬ</string>
     <string name="macro_name_hint">Название макроса</string>
     <string name="macro_actions_label">Действия макроса:</string>
+    <string name="add_delay_btn">+ЗАДЕРЖКА</string>
+    <string name="add_runner_btn">+БЕГУНОК</string>
+    <string name="add_static_btn">+СТАТИЧНЫЙ</string>
+    <string name="add_wave_btn">+ВОЛНА</string>
+    <string name="add_draw_btn">+РИСУНОК</string>
+    <string name="glyph_area_label">Область глифов</string>
+    <string name="glyph_speed_label">Скорость</string>
+    <string name="glyph_reverse_label">Бег в обратную сторону</string>
+    <string name="glyph_wave_settings">Настройки волны</string>
+    <string name="glyph_wave_count">Количество волн</string>
+    <string name="glyph_wave_thickness">Толщина волны</string>
+    <string name="glyph_wave_distance">Расстояние между волн</string>
+    <string name="glyph_wave_scope">Область влияния</string>
+    <string name="glyph_wave_scope_all">Все зоны</string>
+    <string name="glyph_wave_scope_one">Текущая зона</string>
+    <string name="glyph_draw_title">Создание рисунка</string>
+    <string name="glyph_select_start_led">Выберите начальную лампочку</string>
+    <string name="glyph_fade_out">Плавное затухание</string>
+    <string name="glyph_fade_speed">Скорость затухания</string>
+    <string name="glyph_area_1">Область 1</string>
+    <string name="glyph_area_2">Область 2</string>
+    <string name="glyph_area_3">Область 3</string>
+    <string name="glyph_action_runner">Бегунок</string>
+    <string name="glyph_action_static">Статичный</string>
+    <string name="glyph_action_delay">Задержка</string>
     <string name="touch_btn">КАСАНИЕ</string>
     <string name="swipe_btn">СВАЙП</string>
     <string name="delay_btn">ЗАДЕРЖКА</string>
@@ -285,10 +369,18 @@
     <!-- Priority -->
     <string name="event_priority_title">Приоритет ивентов</string>
     <string name="priority_drag_hint">Перетащите ивент для изменения приоритета (первые в списке проверяются раньше).</string>
+    <string name="revert">Вернуть</string>
+    <string name="press_single">Одинарное</string>
+    <string name="press_hold">Удержание</string>
+    <string name="press_double">Двойное</string>
+    <string name="press_triple">Тройное</string>
     <string name="slot_single_short">Один.</string>
     <string name="slot_long_short">Удерж.</string>
     <string name="slot_double_short">Двой.</string>
     <string name="slot_triple_short">Трой.</string>
+    <string name="slot_volume_up_short">Громк. +</string>
+    <string name="slot_volume_down_short">Громк. -</string>
+    <string name="slot_power_long_short">Питание</string>
 
     <!-- Glyph -->
     <string name="glyph_control_title">Управление Глифами</string>
@@ -299,7 +391,7 @@
     <string name="glyph_runner_btn">ГЛИФ БЕГУНОК</string>
 
     <!-- Games & General -->
-    <string name="games_title">Gliph game</string>
+    <string name="games_title">Глиф узор</string>
     <string name="in_development_msg">Этот раздел находится в разработке</string>
     <string name="events_empty_msg">Список пуст. Нажмите +, чтобы добавить правило.</string>
     <string name="add_event">Добавить ивент</string>
@@ -330,4 +422,51 @@
     <string name="silent_mode_label">Без звука</string>
     <string name="vibrate_mode_label">Виброрежим</string>
     <string name="hotspot_label">Точка доступа</string>
+
+    <string name="group_quick_system">⚡ Быстрые действия</string>
+    <string name="group_capture_reading">📷 Захват и экран</string>
+    <string name="group_media">🎵 Звук и медиа</string>
+    <string name="group_navigation">🧭 Навигация</string>
+    <string name="group_launch">🚀 Запуск и ярлыки</string>
+    <string name="search_action_hint">Поиск действия</string>
+
+    <string name="action_rotation_lock_title">Блокировка вращения</string>
+    <string name="action_ring_vibrate_title">Звук / Вибрация</string>
+    <string name="action_voice_assistant_title">Голосовой ассистент</string>
+    <string name="action_wake_screen_title">Пробуждение экрана</string>
+    <string name="action_night_light_title">Ночной свет</string>
+    <string name="action_extra_dim_title">Extra Dim (Сверхнизкая яркость)</string>
+    <string name="action_internet_title">Интернет (Wi-Fi)</string>
+    <string name="action_bluetooth_title">Bluetooth</string>
+    <string name="action_power_menu_title">Меню питания</string>
+    <string name="action_set_a_timer_title">Установка таймера</string>
+    <string name="action_recent_apps_title">Недавние приложения</string>
+    <string name="action_read_screen_title">Чтение экрана</string>
+    <string name="action_read_aloud_title">Чтение вслух</string>
+    <string name="action_copy_title">Копировать</string>
+    <string name="action_paste_title">Вставить</string>
+    <string name="action_calculator_title">Калькулятор</string>
+    <string name="action_open_camera_title">Открыть камеру</string>
+    <string name="action_screen_recording_title">Запись экрана</string>
+    <string name="action_camera_shutter_title">Затвор камеры</string>
+    <string name="action_mute_media_title">Отключить звук медиа</string>
+    <string name="action_quick_settings_title">Быстрые настройки</string>
+    <string name="action_wallet_title">Кошелек (Wallet)</string>
+    <string name="action_chatgpt_title">ChatGPT</string>
+    <string name="action_play_pause_title">Воспроизведение / Пауза</string>
+    <string name="action_next_track_title">Следующий трек</string>
+    <string name="action_previous_track_title">Предыдущий трек</string>
+    <string name="action_app_shortcut_title">Ярлык приложения</string>
+    <string name="action_clipboard_title">Буфер обмена</string>
+    <string name="clipboard_empty">Буфер обмена пуст</string>
+    <string name="clipboard_clear">Очистить</string>
+    <string name="clipboard_search_hint">Поиск по буферу...</string>
+    <string name="copied_to_clipboard">Скопировано в буфер обмена</string>
+    <string name="tab_recent">Недавние</string>
+    <string name="tab_history">История</string>
+    <string name="tab_favorites">Избранные</string>
+    <string name="menu_copy">Копировать</string>
+    <string name="menu_paste">Вставить</string>
+    <string name="menu_favorite">Избранное</string>
+    <string name="menu_delete">Удалить</string>
 </resources>
