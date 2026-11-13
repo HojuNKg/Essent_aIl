@@ -57,7 +57,7 @@
 
 ## 📥 Установка (Сайдлоадинг)
 
-1. Скачайте свежий APK (`EssentAI-0.5.1.apk`) из раздела [Releases](https://github.com/HojuNKg/Essent_aIl/releases).
+1. Скачайте свежий APK (`EssentAI-0.5.5.apk`) из раздела [Releases](https://github.com/HojuNKg/Essent_aIl/releases).
 2. Установите приложение на ваше устройство.
 3. Откройте приложение и включите службу в настройках **Accessibility (Спец. возможности)**.
 
@@ -76,7 +76,7 @@ adb shell pm disable-user --user 0 com.nothing.essentialintelligence
 ```bash
 ./gradlew :app:assembleDebug
 ```
-Собранный APK будет находиться по пути: `app/build/outputs/apk/debug/EssentAI-0.5.1.apk`.
+Собранный APK будет находиться по пути: `app/build/outputs/apk/debug/EssentAI-0.5.5.apk`.
 
 ---
 
