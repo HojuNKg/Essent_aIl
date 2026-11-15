@@ -13,8 +13,8 @@ android {
         applicationId = "com.HojuNK.essent_all"
         minSdk = 33
         targetSdk = 36
-        versionCode = 11
-        versionName = "git add app/build.gradle.kts README.md; git commit -m \"Release v0.5.5: update version to 0.5.5\"; git tag v0.5.5; git push origin main --tags"
+        versionCode = 12
+        versionName = "0.6.2"
     }
 
     buildTypes {
