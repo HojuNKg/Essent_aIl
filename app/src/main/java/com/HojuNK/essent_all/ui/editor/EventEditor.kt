@@ -111,6 +111,14 @@ fun EventAddPanel(
         }
     }
 
+    val useDark = com.HojuNK.essent_all.LocalUseDark.current
+    val topBarBg = if (useDark) Color.Black else Color.White
+    val textColor = if (useDark) Color.White else Color.Black
+    val mutedColor = if (useDark) Color.Gray else Color.DarkGray
+    val cardBg = if (useDark) Color.Black else Color.White
+    val innerCardBg = if (useDark) Color(0xFF1A1A1A) else Color(0xFFF0F0F0)
+    val borderColor = if (useDark) Color.Gray.copy(alpha = 0.3f) else Color.LightGray
+
     // Header animation logic
     val collapseProgress by remember {
         derivedStateOf {
@@ -124,7 +132,7 @@ fun EventAddPanel(
 
     Surface(
         modifier = Modifier.fillMaxSize().systemBarsPadding(),
-        color = Color.Black
+        color = topBarBg
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
             // Fixed Header Area
@@ -134,11 +142,11 @@ fun EventAddPanel(
                     .zIndex(10f)
                     .drawBehind {
                         val blurHeight = 90.dp.toPx()
-                        drawRect(color = Color.Black, size = size)
+                        drawRect(color = topBarBg, size = size)
                         if (collapseProgress > 0f) {
                             drawRect(
                                 brush = Brush.verticalGradient(
-                                    colors = listOf(Color.Black.copy(alpha = collapseProgress), Color.Transparent),
+                                    colors = listOf(topBarBg.copy(alpha = collapseProgress), Color.Transparent),
                                     startY = size.height,
                                     endY = size.height + blurHeight
                                 ),
@@ -164,7 +172,7 @@ fun EventAddPanel(
                     ) {
                         Text(
                             text = if (initialRule.title.isEmpty()) "СОЗДАЕМ ИВЕНТ" else "РЕДАКТИРУЕМ ИВЕНТ",
-                            color = Color.White,
+                            color = textColor,
                             style = MaterialTheme.typography.titleMedium,
                             textAlign = TextAlign.Center,
                             fontWeight = FontWeight.Bold,
@@ -277,35 +285,35 @@ fun EventAddPanel(
                             modifier = Modifier
                                 .weight(0.75f)
                                 .fillMaxHeight()
-                                .background(Color.Black, RoundedCornerShape(24.dp))
-                                .border(2.dp, Color.Gray.copy(alpha = 0.3f), RoundedCornerShape(24.dp))
+                                .background(cardBg, RoundedCornerShape(24.dp))
+                                .border(2.dp, borderColor, RoundedCornerShape(24.dp))
                                 .padding(6.dp)
                         ) {
                             Row(
                                 modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Icon(Icons.Default.Edit, null, tint = Color.White.copy(alpha = 0.7f), modifier = Modifier.size(12.dp))
+                                Icon(Icons.Default.Edit, null, tint = mutedColor.copy(alpha = 0.7f), modifier = Modifier.size(12.dp))
                                 Spacer(Modifier.width(6.dp))
-                                Text("Название ивента", color = Color.White, style = MaterialTheme.typography.labelSmall)
+                                Text("Название ивента", color = mutedColor, style = MaterialTheme.typography.labelSmall)
                             }
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .weight(1f)
-                                    .background(Color(0xFF1A1A1A), RoundedCornerShape(18.dp))
+                                    .background(innerCardBg, RoundedCornerShape(18.dp))
                                     .padding(horizontal = 16.dp),
                                 contentAlignment = Alignment.CenterStart
                             ) {
                                 androidx.compose.foundation.text.BasicTextField(
                                     value = currentRule.title,
                                     onValueChange = { currentRule = currentRule.copy(title = it) },
-                                    textStyle = MaterialTheme.typography.bodyLarge.copy(color = Color.White),
-                                    cursorBrush = androidx.compose.ui.graphics.SolidColor(Color.White),
+                                    textStyle = MaterialTheme.typography.bodyLarge.copy(color = textColor),
+                                    cursorBrush = androidx.compose.ui.graphics.SolidColor(textColor),
                                     modifier = Modifier.fillMaxWidth(),
                                     decorationBox = { innerTextField ->
                                         if (currentRule.title.isEmpty()) {
-                                            Text("Ивент без названия", color = Color.Gray.copy(alpha = 0.5f), style = MaterialTheme.typography.bodyLarge)
+                                            Text("Ивент без названия", color = mutedColor.copy(alpha = 0.5f), style = MaterialTheme.typography.bodyLarge)
                                         }
                                         innerTextField()
                                     }
@@ -1165,12 +1173,19 @@ fun ConditionRow(
     onEdit: () -> Unit,
     onDelete: () -> Unit
 ) {
+    val useDark = com.HojuNK.essent_all.LocalUseDark.current
+    val cardBg = if (useDark) Color.Black else Color.White
+    val innerCardBg = if (useDark) Color(0xFF1A1A1A) else Color(0xFFF0F0F0)
+    val textColor = if (useDark) Color.White else Color.Black
+    val mutedColor = if (useDark) Color.Gray else Color.DarkGray
+    val borderColor = if (useDark) Color.Gray.copy(alpha = 0.3f) else Color.LightGray
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .height(110.dp)
-            .background(Color.Black, RoundedCornerShape(24.dp))
-            .border(2.dp, Color.Gray.copy(alpha = 0.3f), RoundedCornerShape(24.dp))
+            .background(cardBg, RoundedCornerShape(24.dp))
+            .border(2.dp, borderColor, RoundedCornerShape(24.dp))
             .padding(6.dp)
     ) {
         Row(
@@ -1184,12 +1199,12 @@ fun ConditionRow(
                 ConditionType.LIGHT -> Icons.Default.LightMode
                 else -> Icons.Default.Tune
             }
-            Icon(typeIcon, null, tint = Color.White.copy(alpha = 0.7f), modifier = Modifier.size(12.dp))
+            Icon(typeIcon, null, tint = mutedColor.copy(alpha = 0.7f), modifier = Modifier.size(12.dp))
             Spacer(Modifier.width(6.dp))
-            Text(if (isExclusion) "Исключение" else "Условие", color = Color.White, style = MaterialTheme.typography.labelSmall)
+            Text(if (isExclusion) "Исключение" else "Условие", color = textColor, style = MaterialTheme.typography.labelSmall)
             Spacer(Modifier.weight(1f))
             Icon(
-                Icons.Default.Close, null, tint = Color.White,
+                Icons.Default.Close, null, tint = textColor,
                 modifier = Modifier.size(16.dp).clickable { onDelete() }
             )
         }
@@ -1197,7 +1212,7 @@ fun ConditionRow(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
-                .background(Color(0xFF1A1A1A), RoundedCornerShape(18.dp))
+                .background(innerCardBg, RoundedCornerShape(18.dp))
                 .clickable { onEdit() }
                 .padding(horizontal = 16.dp),
             contentAlignment = Alignment.CenterStart
@@ -1253,7 +1268,7 @@ fun ConditionRow(
                 ConditionType.HOTSPOT -> "${stringResource(R.string.hotspot_label)}: ${if (condition.value == "ON") stringResource(R.string.state_active) else stringResource(R.string.state_none)}"
                 else -> condition.value
             }
-            Text(label, color = Color.White, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(label, color = textColor, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
 }

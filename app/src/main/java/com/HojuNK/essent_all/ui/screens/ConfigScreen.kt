@@ -1,5 +1,7 @@
 package com.HojuNK.essent_all.ui.screens
 
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -19,6 +21,9 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.text.SpanStyle
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.pager.HorizontalPager
@@ -70,6 +75,22 @@ fun ConfigScreen(
     onActionPickerStateChange: ((Boolean) -> Unit)? = null,
     onOpenBlockDetail: (String, List<TapSlot>) -> Unit
 ) {
+    BackHandler(enabled = true) {
+        // Do nothing on Key screen
+    }
+
+    val useDark = when (keyMap.theme) {
+        AppTheme.AUTO -> isSystemInDarkTheme()
+        AppTheme.LIGHT -> false
+        AppTheme.DARK -> true
+    }
+    val topBarBg = if (useDark) Color.Black else Color.White
+    val textColor = if (useDark) Color.White else Color.Black
+    val mutedColor = if (useDark) Color.Gray else Color.DarkGray
+    val cardBg = if (useDark) Color.Black else Color.White
+    val innerCardBg = if (useDark) Color(0xFF1A1A1A) else Color(0xFFF0F0F0)
+    val borderColor = if (useDark) Color.Gray.copy(alpha = 0.3f) else Color.LightGray
+
     val radialMenuState = LocalRadialMenuState.current
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -110,14 +131,19 @@ fun ConfigScreen(
             if (configuration.orientation == android.content.res.Configuration.ORIENTATION_PORTRAIT) {
                 TopAppBar(
                     title = { TypewriterTitle() },
-                    colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = Color.Transparent,
+                        actionIconContentColor = textColor,
+                        navigationIconContentColor = textColor,
+                        titleContentColor = textColor
+                    ),
                     modifier = Modifier
                         .drawBehind {
                             val blurHeight = 45.dp.toPx()
                             // Размытие и затухание в шапке: градиент от полностью непрозрачного черного к мягкому прозрачному
                             drawRect(
                                 brush = Brush.verticalGradient(
-                                    colors = listOf(Color.Black, Color.Black.copy(alpha = 0.5f)),
+                                    colors = listOf(topBarBg, topBarBg.copy(alpha = 0.5f)),
                                     startY = 0f,
                                     endY = size.height
                                 ),
@@ -125,7 +151,7 @@ fun ConfigScreen(
                             )
                             drawRect(
                                 brush = Brush.verticalGradient(
-                                    colors = listOf(Color.Black.copy(alpha = 0.5f), Color.Transparent),
+                                    colors = listOf(topBarBg.copy(alpha = 0.5f), Color.Transparent),
                                     startY = size.height,
                                     endY = size.height + blurHeight
                                 ),
@@ -144,7 +170,7 @@ fun ConfigScreen(
                         },
                     actions = {
                         IconButton(onClick = onOpenSettings) {
-                            Icon(Icons.Default.Settings, null)
+                            Icon(Icons.Default.Settings, null, tint = textColor)
                         }
                     }
                 )
@@ -178,11 +204,50 @@ fun ConfigScreen(
             ),
             verticalArrangement = Arrangement.spacedBy(24.dp)
         ) {
+            // Master Remapping Switch (Monochrome, no border, above divider)
             item {
-                Text(stringResource(R.string.assign_action_hint), style = MaterialTheme.typography.bodyMedium)
+                val isEnabled = keyMap.isKeyRemappingEnabled
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            scope.launch {
+                                Config.setKeyRemappingEnabled(ctx, !isEnabled)
+                            }
+                        }
+                        .padding(vertical = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
+                        Text(
+                            text = buildAnnotatedString {
+                                withStyle(style = SpanStyle(color = textColor)) {
+                                    append("Переназначьте действия для каждого типа нажатия физических клавиш ")
+                                }
+                                withStyle(style = SpanStyle(color = mutedColor)) {
+                                    append(if (isEnabled) "(переназначено)" else "(не переназначено)")
+                                }
+                            },
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                    Switch(
+                        checked = isEnabled,
+                        onCheckedChange = { checked ->
+                            scope.launch {
+                                Config.setKeyRemappingEnabled(ctx, checked)
+                            }
+                        }
+                    )
+                }
             }
             item {
                 HorizontalDivider()
+            }
+            item {
+                Text(stringResource(R.string.assign_action_hint), style = MaterialTheme.typography.bodyMedium)
             }
 
             // Block 1: Essential Key
@@ -390,6 +455,13 @@ private fun FavoritesActionSettings(
     onUpdateApps: (List<String>) -> Unit,
     onUpdateVisibility: (Boolean, Boolean, Boolean, Boolean, Int) -> Unit
 ) {
+    val useDark = com.HojuNK.essent_all.LocalUseDark.current
+    val textColor = if (useDark) Color.White else Color.Black
+    val mutedColor = if (useDark) Color.Gray else Color.DarkGray
+    val cardBg = if (useDark) Color.Black else Color.White
+    val innerCardBg = if (useDark) Color(0xFF1A1A1A) else Color(0xFFF0F0F0)
+    val borderColor = if (useDark) Color.Gray.copy(alpha = 0.3f) else Color.LightGray
+
     Surface(tonalElevation = 1.dp, shape = RoundedCornerShape(12.dp), modifier = Modifier.padding(start = 16.dp, top = 4.dp, bottom = 8.dp)) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(stringResource(R.string.select_favorites_title), style = MaterialTheme.typography.labelLarge)
@@ -404,8 +476,8 @@ private fun FavoritesActionSettings(
                 }
             }
 
-            HorizontalDivider(color = Color.Gray.copy(alpha = 0.3f))
-            Text(stringResource(R.string.display_settings), style = MaterialTheme.typography.titleMedium, color = Color.White)
+            HorizontalDivider(color = borderColor)
+            Text(stringResource(R.string.display_settings), style = MaterialTheme.typography.titleMedium, color = textColor)
 
             ShortcutToggle(stringResource(R.string.keep_on_click), config.keepVisibleOnClick) {
                 onUpdateVisibility(it, config.keepVisibleOnOutsideClick, config.keepVisibleOnBack, config.keepVisibleOnKey, config.autoHideSeconds)
@@ -418,7 +490,7 @@ private fun FavoritesActionSettings(
             }
 
             Spacer(Modifier.height(16.dp))
-            Text(stringResource(R.string.auto_hide), style = MaterialTheme.typography.labelLarge, color = Color.Gray)
+            Text(stringResource(R.string.auto_hide), style = MaterialTheme.typography.labelLarge, color = mutedColor)
 
             val autoHideOptions = listOf(0 to stringResource(R.string.never_hide), 2 to "2 ${stringResource(R.string.unit_seconds)}", 5 to "5 ${stringResource(R.string.unit_seconds)}", 10 to "10 ${stringResource(R.string.unit_seconds)}", 20 to "20 ${stringResource(R.string.unit_seconds)}")
             LazyVerticalGrid(columns = GridCells.Fixed(2), modifier = Modifier.height(120.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -427,11 +499,11 @@ private fun FavoritesActionSettings(
                     Surface(
                         onClick = { onUpdateVisibility(config.keepVisibleOnClick, config.keepVisibleOnOutsideClick, config.keepVisibleOnBack, config.keepVisibleOnKey, secs) },
                         shape = RoundedCornerShape(8.dp),
-                        color = if (selected) Color.White else Color(0xFF2B2B2B),
+                        color = if (selected) textColor else innerCardBg,
                         modifier = Modifier.height(40.dp)
                     ) {
                         Box(contentAlignment = Alignment.Center) {
-                            Text(label, color = if (selected) Color.Black else Color.White, style = MaterialTheme.typography.bodySmall)
+                            Text(label, color = if (selected) cardBg else textColor, style = MaterialTheme.typography.bodySmall)
                         }
                     }
                 }
@@ -463,6 +535,10 @@ private fun ControlActionSettings(items: List<ControlItem>, onUpdate: (List<Cont
 
 @Composable
 fun SlotRow(slot: TapSlot, valueLabel: String, icon: ImageBitmap?, enabled: Boolean, isCustom: Boolean, expanded: Boolean, onExpandToggle: () -> Unit, onClick: () -> Unit, onIconClick: () -> Unit) {
+    val useDark = com.HojuNK.essent_all.LocalUseDark.current
+    val textColor = if (useDark) Color.White else Color.Black
+    val mutedColor = if (useDark) Color.Gray else Color.DarkGray
+
     Row(
         modifier = Modifier
             .clickable(enabled = enabled, onClick = onClick)
@@ -472,8 +548,8 @@ fun SlotRow(slot: TapSlot, valueLabel: String, icon: ImageBitmap?, enabled: Bool
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
         Column(Modifier.weight(1f)) {
-            Text(stringResource(slot.labelRes), style = MaterialTheme.typography.bodyMedium, color = Color.White)
-            Text(valueLabel, style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+            Text(stringResource(slot.labelRes), style = MaterialTheme.typography.bodyMedium, color = textColor)
+            Text(valueLabel, style = MaterialTheme.typography.bodySmall, color = mutedColor)
         }
         if (icon != null) {
             Spacer(Modifier.width(8.dp))
@@ -488,7 +564,7 @@ fun SlotRow(slot: TapSlot, valueLabel: String, icon: ImageBitmap?, enabled: Bool
         if (isCustom || valueLabel.startsWith(stringResource(R.string.shortcut_prefix))) {
             Spacer(Modifier.width(8.dp))
             IconButton(onClick = onExpandToggle, modifier = Modifier.size(28.dp)) {
-                Icon(if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown, null, tint = Color.Gray)
+                Icon(if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown, null, tint = mutedColor)
             }
         }
     }
@@ -502,6 +578,11 @@ fun MacroSelectionSettings(
     onSelect: (String) -> Unit,
     onUpdateMode: (MacroMode) -> Unit
 ) {
+    val useDark = com.HojuNK.essent_all.LocalUseDark.current
+    val textColor = if (useDark) Color.White else Color.Black
+    val mutedColor = if (useDark) Color.Gray else Color.DarkGray
+    val borderColor = if (useDark) Color.Gray.copy(alpha = 0.3f) else Color.LightGray
+
     Surface(tonalElevation = 1.dp, shape = RoundedCornerShape(12.dp), modifier = Modifier.padding(start = 16.dp, top = 4.dp, bottom = 8.dp)) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(stringResource(R.string.macro_execution_mode), style = MaterialTheme.typography.labelLarge)
@@ -515,18 +596,18 @@ fun MacroSelectionSettings(
                 }
             }
 
-            HorizontalDivider(color = Color.Gray.copy(alpha = 0.3f))
+            HorizontalDivider(color = borderColor)
 
             Text(stringResource(R.string.select_macro), style = MaterialTheme.typography.labelLarge)
             if (macros.isEmpty()) {
-                Text(stringResource(R.string.macros_empty), color = Color.Gray, style = MaterialTheme.typography.bodySmall)
+                Text(stringResource(R.string.macros_empty), color = mutedColor, style = MaterialTheme.typography.bodySmall)
             }
             macros.forEach { macro ->
                 val isSelected = currentId == macro.id
                 Row(modifier = Modifier.fillMaxWidth().clickable { onSelect(macro.id) }.padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                     EventIconDisplay(macro.icon, displaySize = 24.dp)
                     Spacer(Modifier.width(12.dp))
-                    Text(macro.title, modifier = Modifier.weight(1f), color = if (isSelected) Color.White else Color.Gray)
+                    Text(macro.title, modifier = Modifier.weight(1f), color = if (isSelected) textColor else mutedColor)
                     RadioButton(selected = isSelected, onClick = null)
                 }
             }
@@ -647,12 +728,23 @@ fun ActionBlockCard(
     onAppPick: (TapSlot) -> Unit,
     onPowerCheck: () -> Unit
 ) {
+    val useDark = when (keyMap.theme) {
+        AppTheme.AUTO -> isSystemInDarkTheme()
+        AppTheme.LIGHT -> false
+        AppTheme.DARK -> true
+    }
+    val cardBg = if (useDark) Color.Black else Color.White
+    val innerCardBg = if (useDark) Color(0xFF1A1A1A) else Color(0xFFF0F0F0)
+    val textColor = if (useDark) Color.White else Color.Black
+    val mutedColor = if (useDark) Color.Gray else Color.DarkGray
+    val borderColor = if (useDark) Color.Gray.copy(alpha = 0.3f) else Color.LightGray
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .background(Color.Black, RoundedCornerShape(24.dp))
-            .border(2.dp, Color.Gray.copy(alpha = 0.3f), RoundedCornerShape(24.dp))
+            .background(cardBg, RoundedCornerShape(24.dp))
+            .border(2.dp, borderColor, RoundedCornerShape(24.dp))
             .padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
@@ -666,13 +758,13 @@ fun ActionBlockCard(
         ) {
             Text(
                 text = title,
-                color = Color.White,
+                color = textColor,
                 style = MaterialTheme.typography.titleMedium
             )
             Icon(
                 imageVector = Icons.Default.KeyboardArrowRight,
                 contentDescription = null,
-                tint = Color.Gray,
+                tint = mutedColor,
                 modifier = Modifier.size(24.dp)
             )
         }
@@ -681,7 +773,7 @@ fun ActionBlockCard(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(Color(0xFF1A1A1A), RoundedCornerShape(18.dp))
+                .background(innerCardBg, RoundedCornerShape(18.dp))
         ) {
             slots.forEachIndexed { index, slot ->
                 SlotRowComposable(
@@ -696,7 +788,7 @@ fun ActionBlockCard(
                 )
                 if (index < slots.size - 1) {
                     HorizontalDivider(
-                        color = Color.Gray.copy(alpha = 0.3f),
+                        color = borderColor,
                         thickness = 1.dp,
                         modifier = Modifier.padding(horizontal = 12.dp)
                     )
@@ -717,17 +809,22 @@ fun InlineActionPicker(
     onPick: (String?) -> Unit,
     onPowerCheck: () -> Unit
 ) {
+    val useDark = com.HojuNK.essent_all.LocalUseDark.current
+    val textColor = if (useDark) Color.White else Color.Black
+    val innerCardBg = if (useDark) Color(0xFF1A1A1A) else Color(0xFFF0F0F0)
+    val borderColor = if (useDark) Color.Gray.copy(alpha = 0.3f) else Color.LightGray
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(Color(0xFF1A1A1A), RoundedCornerShape(24.dp))
-            .border(2.dp, Color.Gray.copy(alpha = 0.3f), RoundedCornerShape(24.dp))
+            .background(innerCardBg, RoundedCornerShape(24.dp))
+            .border(2.dp, borderColor, RoundedCornerShape(24.dp))
             .padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         Text(
             text = stringResource(R.string.select_action_title),
-            color = Color.White,
+            color = textColor,
             style = MaterialTheme.typography.titleMedium,
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp)
         )

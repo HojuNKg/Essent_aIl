@@ -6,7 +6,10 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -17,6 +20,7 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.platform.LocalContext
@@ -57,8 +61,13 @@ private var hasPlayedTitleAnimation = false
 fun TypewriterTitle(
     baseText: String = stringResource(R.string.app_name),
     targetText: String = "Not essential space",
-    animate: Boolean = true
+    animate: Boolean = true,
+    fontSize: androidx.compose.ui.unit.TextUnit = 20.sp,
+    fontWeight: FontWeight = FontWeight.Bold
 ) {
+    val useDark = com.HojuNK.essent_all.LocalUseDark.current
+    val titleColor = if (useDark) Color.White else Color.Black
+
     // Анимируем только если передан флаг И анимация еще не проигрывалась в этой сессии
     val shouldAnimate = animate && !hasPlayedTitleAnimation
 
@@ -79,9 +88,9 @@ fun TypewriterTitle(
             // Помечаем, что анимация завершена для всей текущей сессии
             hasPlayedTitleAnimation = true
         }
-        Text(text)
+        Text(text, fontSize = fontSize, fontWeight = fontWeight, color = titleColor)
     } else {
-        Text(targetText)
+        Text(targetText, fontSize = fontSize, fontWeight = fontWeight, color = titleColor)
     }
 }
 
@@ -98,7 +107,11 @@ fun PillBottomNavigation(
     modifier: Modifier = Modifier,
     isDragging: Boolean = false,
     onDragEnd: () -> Unit = {},
-    isHidden: Boolean = false
+    isHidden: Boolean = false,
+    screens: List<NavScreen> = listOf(NavScreen.KEY, NavScreen.EVENTS, NavScreen.MACROS, NavScreen.MORE),
+    isEditing: Boolean = false,
+    selectedEditSlot: Int = 1,
+    onSelectEditSlot: (Int) -> Unit = {}
 ) {
     val isExpanded = !isHidden
     
@@ -161,10 +174,15 @@ fun PillBottomNavigation(
         label = "stretchScale"
     )
 
+    val useDark = com.HojuNK.essent_all.LocalUseDark.current
+    val barColor = if (useDark) Color(0xFF2B2B2B) else Color(0xFFE5E5E5)
+    val barBorderColor = if (useDark) Color.Black.copy(alpha = surfaceAlpha) else Color.Gray.copy(alpha = 0.3f * surfaceAlpha)
+    val selectorColor = if (useDark) Color(0xFF1A1A1A) else Color.White
+
     Surface(
-        color = Color(0xFF2B2B2B), // Серый фон панели
+        color = barColor,
         shape = RoundedCornerShape(50.dp),
-        border = BorderStroke((1f * surfaceAlpha).dp, Color.Black.copy(alpha = surfaceAlpha)),
+        border = BorderStroke((1f * surfaceAlpha).dp, barBorderColor),
         modifier = modifier
             .width(barWidth)
             .height(70.dp)
@@ -174,8 +192,8 @@ fun PillBottomNavigation(
                 this.scaleY = scaleY
                 alpha = surfaceAlpha
             }
-            .pointerInput(isExpanded) {
-                if (!isExpanded || hideProgress > 0.1f) return@pointerInput
+            .pointerInput(isExpanded && !isEditing) {
+                if (!isExpanded || hideProgress > 0.1f || isEditing) return@pointerInput
                 detectDragGestures(
                     onDragStart = { offset ->
                         val selectorCenterPx = with(density) { (82f + currentPagerPosition * 60f).dp.toPx() }
@@ -202,14 +220,14 @@ fun PillBottomNavigation(
                 }
         ) {
             // Единый "перетекающий" селектор
-            if (isExpanded) {
+            if (isExpanded && !isEditing) {
                 Box(
                     modifier = Modifier
                         .offset(x = (safePagerPosition * 60f).dp)
                         .padding(vertical = 8.dp)
                         .width(148.dp)
                         .fillMaxHeight()
-                        .background(Color(0xFF1A1A1A), RoundedCornerShape(50.dp))
+                        .background(selectorColor, RoundedCornerShape(50.dp))
                 )
             }
 
@@ -218,8 +236,8 @@ fun PillBottomNavigation(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                NavScreen.entries.forEachIndexed { index, screen ->
-                    val selectionProgress = (1f - abs(index - safePagerPosition)).coerceIn(0f, 1f)
+                screens.forEachIndexed { index, screen ->
+                    val selectionProgress = if (isEditing) (if (index == selectedEditSlot) 1f else 0f) else (1f - abs(index - safePagerPosition)).coerceIn(0f, 1f)
                     val itemWidth = (56f + 92f * selectionProgress).dp
 
                     PillNavItem(
@@ -227,7 +245,17 @@ fun PillBottomNavigation(
                         pagerPosition = safePagerPosition,
                         screen = screen,
                         width = itemWidth,
-                        onClick = { if (isExpanded) onScreenSelected(screen) }
+                        isEditing = isEditing,
+                        selectedEditSlot = selectedEditSlot,
+                        onClick = {
+                            if (isEditing) {
+                                if (index == 1 || index == 2) {
+                                    onSelectEditSlot(index)
+                                }
+                            } else if (isExpanded) {
+                                onScreenSelected(screen)
+                            }
+                        }
                     )
                 }
             }
@@ -241,28 +269,43 @@ fun PillNavItem(
     pagerPosition: Float,
     screen: NavScreen,
     width: androidx.compose.ui.unit.Dp,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    isEditing: Boolean = false,
+    selectedEditSlot: Int = 1
 ) {
     val interactionSource = remember { MutableInteractionSource() }
-    val selectionProgress = (1f - abs(index - pagerPosition)).coerceIn(0f, 1f)
+    val selectionProgress = if (isEditing) (if (index == selectedEditSlot) 1f else 0f) else (1f - abs(index - pagerPosition)).coerceIn(0f, 1f)
     
     // Плавный расчет отступа для иконки
     val startPadding = (12f + 4f * selectionProgress).dp
 
     // Вычисляем направление "упругого" смещения.
-    // Элементы слева от селектора должны смещаться влево, справа - вправо.
     val diff = index - pagerPosition
     val direction = if (diff > 0) 1f else -1f
 
-    // drift - это величина смещения, которая уменьшается до 0 при выборе пункта.
-    // Мы делаем ее симметричной, чтобы иконки с обеих сторон "раздвигались" селектором.
-    val drift = (1f - selectionProgress) * 12f * direction
+    val drift = if (isEditing) 0f else (1f - selectionProgress) * 12f * direction
+
+    val isFixedSlot = (index == 0 || index == 3)
+    val isSelectedSlot = (isEditing && index == selectedEditSlot)
+
+    val borderModifier = when {
+        isEditing && isFixedSlot -> Modifier.border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(50.dp))
+        isEditing && isSelectedSlot -> Modifier.border(2.dp, Color.White, RoundedCornerShape(50.dp))
+        isEditing && !isFixedSlot -> Modifier.border(1.dp, Color.White.copy(alpha = 0.35f), RoundedCornerShape(50.dp))
+        else -> Modifier
+    }
+
+    val itemAlpha = when {
+        isEditing && isFixedSlot -> 0.4f
+        else -> 1.0f
+    }
 
     Box(
         modifier = Modifier
             .width(width)
             .height(54.dp)
             .clip(RoundedCornerShape(50.dp))
+            .then(borderModifier)
             .clickable(
                 interactionSource = interactionSource,
                 indication = null,
@@ -274,27 +317,52 @@ fun PillNavItem(
             modifier = Modifier
                 .padding(start = startPadding)
                 .graphicsLayer {
-                    // Применяем смещение ко всей группе (иконка + текст)
                     translationX = drift
+                    alpha = itemAlpha
                 },
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Плавный переход цвета (Grey -> White)
-            val iconTint = Color(
-                red = (128 + (255 - 128) * selectionProgress) / 255f,
-                green = (128 + (255 - 128) * selectionProgress) / 255f,
-                blue = (128 + (255 - 128) * selectionProgress) / 255f
-            )
+            val useDark = com.HojuNK.essent_all.LocalUseDark.current
+            val baseTint = if (useDark) {
+                Color(
+                    red = (128 + (255 - 128) * selectionProgress) / 255f,
+                    green = (128 + (255 - 128) * selectionProgress) / 255f,
+                    blue = (128 + (255 - 128) * selectionProgress) / 255f
+                )
+            } else {
+                Color(
+                    red = (120 * (1f - selectionProgress)) / 255f,
+                    green = (120 * (1f - selectionProgress)) / 255f,
+                    blue = (120 * (1f - selectionProgress)) / 255f
+                )
+            }
 
-            Icon(
-                imageVector = screen.icon,
-                contentDescription = stringResource(screen.labelRes),
-                tint = iconTint,
-                modifier = Modifier.size(32.dp)
-            )
+            val iconTint = if (isEditing && isSelectedSlot) (if (useDark) Color.White else Color.Black) else baseTint
+
+            Box(contentAlignment = Alignment.TopEnd) {
+                Icon(
+                    imageVector = screen.icon,
+                    contentDescription = screen.title,
+                    tint = iconTint,
+                    modifier = Modifier.size(32.dp)
+                )
+
+                if (isEditing && isFixedSlot) {
+                    Icon(
+                        imageVector = Icons.Default.Lock,
+                        contentDescription = "Locked",
+                        tint = Color.White.copy(alpha = 0.85f),
+                        modifier = Modifier
+                            .size(14.dp)
+                            .offset(x = 4.dp, y = (-2).dp)
+                            .background(Color.Black.copy(alpha = 0.7f), CircleShape)
+                            .padding(1.dp)
+                    )
+                }
+            }
             
             // Контейнер текста
-            val textAlpha = ((selectionProgress - 0.4f) / 0.6f).coerceIn(0f, 1f)
+            val textAlpha = if (isEditing) (if (isSelectedSlot) 1f else 0f) else ((selectionProgress - 0.4f) / 0.6f).coerceIn(0f, 1f)
             val textSpaceWidth = (92f * selectionProgress).dp
             
             Box(
@@ -308,8 +376,8 @@ fun PillNavItem(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Spacer(Modifier.width(8.dp))
                     Text(
-                        text = stringResource(screen.labelRes),
-                        color = Color.White,
+                        text = screen.title,
+                        color = if (useDark) Color.White else Color.Black,
                         style = MaterialTheme.typography.labelLarge,
                         maxLines = 1,
                         overflow = TextOverflow.Clip,
@@ -374,6 +442,136 @@ fun LabeledPanel(
             contentAlignment = Alignment.Center
         ) {
             EventIconDisplay(value, displaySize = 32.dp)
+        }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+fun SwipeableBlockItem(
+    isEditing: Boolean,
+    onDelete: () -> Unit,
+    onMoveUp: (() -> Unit)?,
+    onMoveDown: (() -> Unit)?,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit
+) {
+    if (!isEditing) {
+        Box(modifier = modifier) { content() }
+        return
+    }
+
+    val density = LocalDensity.current
+    var offsetX by remember { mutableStateOf(0f) }
+    var showActionPanel by remember { mutableStateOf(false) }
+    var isDeleting by remember { mutableStateOf(false) }
+
+    val animatedOffsetX by animateFloatAsState(
+        targetValue = when {
+            isDeleting -> 1000f
+            showActionPanel -> -140f
+            else -> 0f
+        },
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium)
+    )
+    val alphaAnim by animateFloatAsState(
+        targetValue = if (isDeleting) 0f else 1f,
+        animationSpec = tween(200)
+    )
+
+    val actionPanelWidthPx = with(density) { 140.dp.toPx() }
+    val deleteThresholdPx = with(density) { 100.dp.toPx() }
+    val swipeLeftThresholdPx = with(density) { -60.dp.toPx() }
+
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .graphicsLayer(
+                translationX = if (isDeleting) animatedOffsetX else (offsetX + animatedOffsetX).coerceIn(-actionPanelWidthPx, 1000f),
+                alpha = alphaAnim
+            )
+            .pointerInput(isEditing) {
+                if (!isEditing) return@pointerInput
+                detectHorizontalDragGestures(
+                    onDragStart = { },
+                    onDragEnd = {
+                        if (offsetX > deleteThresholdPx) {
+                            isDeleting = true
+                        } else if (offsetX < swipeLeftThresholdPx) {
+                            showActionPanel = true
+                            offsetX = 0f
+                        } else {
+                            offsetX = 0f
+                        }
+                    },
+                    onDragCancel = {
+                        offsetX = 0f
+                    },
+                    onHorizontalDrag = { change, dragAmount ->
+                        change.consume()
+                        offsetX += dragAmount
+                    }
+                )
+            }
+    ) {
+        Box(modifier = Modifier.fillMaxWidth()) {
+            content()
+        }
+
+        if (showActionPanel || animatedOffsetX < -10f) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .width(140.dp)
+                    .fillMaxHeight()
+                    .padding(start = 8.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color(0xFF222222), RoundedCornerShape(16.dp))
+                        .border(1.dp, Color(0xFF444444), RoundedCornerShape(16.dp))
+                        .padding(horizontal = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (onMoveUp != null) {
+                        IconButton(onClick = {
+                            showActionPanel = false
+                            onMoveUp()
+                        }) {
+                            Icon(Icons.Default.KeyboardArrowUp, contentDescription = "Move Up", tint = Color.White)
+                        }
+                    } else {
+                        Spacer(modifier = Modifier.size(36.dp))
+                    }
+
+                    IconButton(onClick = {
+                        isDeleting = true
+                    }) {
+                        Icon(Icons.Default.Delete, contentDescription = "Delete", tint = Color(0xFFFF5555))
+                    }
+
+                    if (onMoveDown != null) {
+                        IconButton(onClick = {
+                            showActionPanel = false
+                            onMoveDown()
+                        }) {
+                            Icon(Icons.Default.KeyboardArrowDown, contentDescription = "Move Down", tint = Color.White)
+                        }
+                    } else {
+                        Spacer(modifier = Modifier.size(36.dp))
+                    }
+                }
+            }
+        }
+    }
+
+    LaunchedEffect(isDeleting) {
+        if (isDeleting) {
+            kotlinx.coroutines.delay(220)
+            onDelete()
         }
     }
 }
@@ -478,6 +676,18 @@ fun PickRow(label: String, icon: ImageBitmap?, selected: Boolean, subLabel: Stri
                     Text(subLabel, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
+        }
+    }
+}
+
+@Composable
+fun rememberUseDark(keyMap: com.HojuNK.essent_all.KeyMap): Boolean {
+    val systemDark = androidx.compose.foundation.isSystemInDarkTheme()
+    return remember(keyMap.theme, systemDark) {
+        when (keyMap.theme) {
+            com.HojuNK.essent_all.AppTheme.AUTO -> systemDark
+            com.HojuNK.essent_all.AppTheme.LIGHT -> false
+            com.HojuNK.essent_all.AppTheme.DARK -> true
         }
     }
 }

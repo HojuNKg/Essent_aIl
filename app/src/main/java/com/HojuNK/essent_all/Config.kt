@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.HojuNK.essent_all.model.NavScreen
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -212,12 +213,17 @@ data class KeyMap(
     val macrosSortAscending: Boolean = false,
     val macrosGroupOption: ListGroupOption = ListGroupOption.GROUPED,
     val glyphPatternsViewMode: EventsViewMode = EventsViewMode.STRIPES,
+    val notesViewMode: EventsViewMode = EventsViewMode.STRIPES,
     val glyphPatternsSortOption: ListSortOption = ListSortOption.CREATION_DATE,
     val glyphPatternsSortAscending: Boolean = false,
     val glyphPatternsGroupOption: ListGroupOption = ListGroupOption.GROUPED,
     val glyphPatterns: List<Macro> = emptyList(),
     val language: AppLanguage = AppLanguage.SYSTEM,
-    val confirmDeletion: Boolean = true
+    val confirmDeletion: Boolean = true,
+    val isKeyRemappingEnabled: Boolean = true,
+    val notesSortOption: ListSortOption = ListSortOption.CREATION_DATE,
+    val notesSortAscending: Boolean = false,
+    val hotbarMiddleScreens: List<NavScreen> = listOf(NavScreen.EVENTS, NavScreen.NOTES)
 ) {
     fun forSlot(slot: TapSlot): String? = when (slot) {
         TapSlot.SINGLE -> single
@@ -481,6 +487,11 @@ object Config {
             } catch (e: Exception) {
                 EventsViewMode.STRIPES
             },
+            notesViewMode = try {
+                EventsViewMode.valueOf(p[stringPreferencesKey("notesViewMode")] ?: EventsViewMode.STRIPES.name)
+            } catch (e: Exception) {
+                EventsViewMode.STRIPES
+            },
             glyphPatternsSortOption = try {
                 ListSortOption.valueOf(p[stringPreferencesKey("glyphPatternsSortOption")] ?: ListSortOption.CREATION_DATE.name)
             } catch (e: Exception) {
@@ -499,6 +510,18 @@ object Config {
                 AppLanguage.SYSTEM
             },
             confirmDeletion = p[booleanPreferencesKey("confirmDeletion")] ?: true,
+            isKeyRemappingEnabled = p[booleanPreferencesKey("isKeyRemappingEnabled")] ?: true,
+            notesSortOption = try {
+                ListSortOption.valueOf(p[stringPreferencesKey("notesSortOption")] ?: ListSortOption.CREATION_DATE.name)
+            } catch (e: Exception) {
+                ListSortOption.CREATION_DATE
+            },
+            notesSortAscending = p[booleanPreferencesKey("notesSortAscending")] ?: false,
+            hotbarMiddleScreens = p[stringPreferencesKey("hotbarMiddleScreens")]?.let { str ->
+                str.split(",").mapNotNull { name ->
+                    try { NavScreen.valueOf(name) } catch (_: Exception) { null }
+                }.filter { it.isCustomizable }.takeIf { it.size == 2 }
+            } ?: listOf(NavScreen.EVENTS, NavScreen.NOTES),
             events = p[stringPreferencesKey("events")]?.let { jsonStr ->
                 try {
                     val arr = JSONArray(jsonStr)
@@ -647,6 +670,12 @@ object Config {
     suspend fun setMacroMode(ctx: Context, slot: TapSlot, mode: MacroMode) {
         ctx.dataStore.edit { p ->
             p[stringPreferencesKey("${slot.key}_macroMode")] = mode.name
+        }
+    }
+
+    suspend fun setHotbarMiddleScreens(ctx: Context, screens: List<NavScreen>) {
+        ctx.dataStore.edit { p ->
+            p[stringPreferencesKey("hotbarMiddleScreens")] = screens.joinToString(",") { it.name }
         }
     }
 
@@ -985,6 +1014,18 @@ object Config {
 
     suspend fun setGlyphPatternsViewMode(ctx: Context, mode: EventsViewMode) {
         ctx.dataStore.edit { p -> p[stringPreferencesKey("glyphPatternsViewMode")] = mode.name }
+    }
+    suspend fun setNotesViewMode(ctx: Context, mode: EventsViewMode) {
+        ctx.dataStore.edit { p -> p[stringPreferencesKey("notesViewMode")] = mode.name }
+    }
+    suspend fun setNotesSortOption(ctx: Context, option: ListSortOption) {
+        ctx.dataStore.edit { p -> p[stringPreferencesKey("notesSortOption")] = option.name }
+    }
+    suspend fun setNotesSortAscending(ctx: Context, ascending: Boolean) {
+        ctx.dataStore.edit { p -> p[booleanPreferencesKey("notesSortAscending")] = ascending }
+    }
+    suspend fun setKeyRemappingEnabled(ctx: Context, enabled: Boolean) {
+        ctx.dataStore.edit { p -> p[booleanPreferencesKey("isKeyRemappingEnabled")] = enabled }
     }
     suspend fun setGlyphPatternsSortOption(ctx: Context, option: ListSortOption) {
         ctx.dataStore.edit { p -> p[stringPreferencesKey("glyphPatternsSortOption")] = option.name }

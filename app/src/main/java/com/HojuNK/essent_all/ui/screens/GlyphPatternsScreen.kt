@@ -10,6 +10,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.*
 import androidx.compose.foundation.lazy.staggeredgrid.*
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -46,12 +47,18 @@ fun GlyphPatternsScreen(
     onEditPattern: (Macro) -> Unit,
     onShowAccessibilityError: () -> Unit,
     isSelectionMode: Boolean = false,
-    onSelectionModeChange: (Boolean) -> Unit = {}
+    onSelectionModeChange: (Boolean) -> Unit = {},
+    onBack: (() -> Unit)? = null
 ) {
     val radialMenuState = LocalRadialMenuState.current
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
     val glyphActive by GlyphController.glyphActive.collectAsState()
+
+    val useDark = com.HojuNK.essent_all.LocalUseDark.current
+    val topBarBg = if (useDark) Color.Black else Color.White
+    val textColor = if (useDark) Color.White else Color.Black
+    val mutedColor = if (useDark) Color.Gray else Color.DarkGray
     
     var showViewAndSortDialog by remember { mutableStateOf(false) }
 
@@ -67,9 +74,15 @@ fun GlyphPatternsScreen(
     var selectedPatternIds by remember { mutableStateOf(setOf<String>()) }
     var showBatchDeleteConfirm by remember { mutableStateOf(false) }
 
-    BackHandler(enabled = localSelectionMode) {
-        updateSelectionMode(false)
-        selectedPatternIds = emptySet()
+    BackHandler(enabled = true) {
+        if (localSelectionMode) {
+            updateSelectionMode(false)
+            selectedPatternIds = emptySet()
+        } else if (onBack != null) {
+            onBack()
+        } else {
+            // Do nothing when in hotbar
+        }
     }
 
     val sortedPatterns = remember(keyMap.glyphPatterns, keyMap.glyphPatternsSortOption, keyMap.glyphPatternsSortAscending) {
@@ -94,18 +107,23 @@ fun GlyphPatternsScreen(
                     TopAppBar(
                         title = {
                             if (localSelectionMode) {
-                                Text(stringResource(R.string.selected_count, selectedPatternIds.size), color = Color.White, fontWeight = FontWeight.Bold)
+                                Text(stringResource(R.string.selected_count, selectedPatternIds.size), color = textColor, fontWeight = FontWeight.Bold)
                             } else {
                                 TypewriterTitle(targetText = stringResource(R.string.games_title), animate = false)
                             }
                         },
-                        colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
+                        colors = TopAppBarDefaults.topAppBarColors(
+                            containerColor = Color.Transparent,
+                            actionIconContentColor = textColor,
+                            navigationIconContentColor = textColor,
+                            titleContentColor = textColor
+                        ),
                         modifier = Modifier
                             .drawBehind {
                                 val blurHeight = 45.dp.toPx()
                                 drawRect(
                                     brush = Brush.verticalGradient(
-                                        colors = listOf(Color.Black, Color.Black.copy(alpha = 0.5f)),
+                                        colors = listOf(topBarBg, topBarBg.copy(alpha = 0.5f)),
                                         startY = 0f,
                                         endY = size.height
                                     ),
@@ -113,7 +131,7 @@ fun GlyphPatternsScreen(
                                 )
                                 drawRect(
                                     brush = Brush.verticalGradient(
-                                        colors = listOf(Color.Black.copy(alpha = 0.5f), Color.Transparent),
+                                        colors = listOf(topBarBg.copy(alpha = 0.5f), Color.Transparent),
                                         startY = size.height,
                                         endY = size.height + blurHeight
                                     ),
@@ -124,7 +142,11 @@ fun GlyphPatternsScreen(
                         navigationIcon = {
                             if (localSelectionMode) {
                                 IconButton(onClick = { updateSelectionMode(false); selectedPatternIds = emptySet() }) {
-                                    Icon(Icons.Default.Close, null, tint = Color.White)
+                                    Icon(Icons.Default.Close, null, tint = textColor)
+                                }
+                            } else if (onBack != null) {
+                                IconButton(onClick = onBack) {
+                                    Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = textColor)
                                 }
                             }
                         },
@@ -134,11 +156,11 @@ fun GlyphPatternsScreen(
                                 IconButton(onClick = {
                                     selectedPatternIds = if (isAllSelected) emptySet() else sortedPatterns.map { it.id }.toSet()
                                 }) {
-                                    Icon(if (isAllSelected) Icons.Default.Deselect else Icons.Default.SelectAll, null, tint = Color.White)
+                                    Icon(if (isAllSelected) Icons.Default.Deselect else Icons.Default.SelectAll, null, tint = textColor)
                                 }
                             } else {
                                 IconButton(onClick = { updateSelectionMode(true) }) {
-                                    Icon(Icons.Default.Checklist, null, tint = Color.White)
+                                    Icon(Icons.Default.Checklist, null, tint = textColor)
                                 }
                                 Box(
                                     modifier = Modifier
@@ -155,7 +177,7 @@ fun GlyphPatternsScreen(
                                     Icon(
                                         imageVector = if (keyMap.glyphPatternsViewMode == EventsViewMode.STRIPES) Icons.Default.ViewStream else Icons.Default.GridView,
                                         contentDescription = null,
-                                        tint = Color.White
+                                        tint = textColor
                                     )
                                 }
                                 IconButton(onClick = {
@@ -164,11 +186,11 @@ fun GlyphPatternsScreen(
                                     Icon(
                                         Icons.Default.Lightbulb,
                                         contentDescription = null,
-                                        tint = if (glyphActive) Color(0xFFFFD700) else Color.White
+                                        tint = if (glyphActive) Color(0xFFFFD700) else textColor
                                     )
                                 }
                                 IconButton(onClick = onOpenSettings) {
-                                    Icon(Icons.Default.Settings, null)
+                                    Icon(Icons.Default.Settings, null, tint = textColor)
                                 }
                             }
                         }
@@ -182,10 +204,10 @@ fun GlyphPatternsScreen(
                         onClick = { 
                             onEditPattern(Macro(UUID.randomUUID().toString(), "✨", "", actions = emptyList(), isEnabled = true))
                         },
-                        containerColor = Color.Gray,
+                        containerColor = if (useDark) Color.Gray else Color.DarkGray,
                         contentColor = Color.White,
                         modifier = Modifier.padding(
-                            bottom = if (isLandscape) 24.dp else 120.dp,
+                            bottom = if (isLandscape) 24.dp else (if (onBack != null) 24.dp else 120.dp),
                             start = if (isLandscape && rotation == ViewSurface.ROTATION_270) 135.dp else 0.dp,
                             end = if (isLandscape && rotation == ViewSurface.ROTATION_90) 135.dp else 0.dp
                         )
@@ -211,7 +233,7 @@ fun GlyphPatternsScreen(
             
             if (sortedPatterns.isEmpty()) {
                 Box(Modifier.fillMaxSize().padding(top = topPadding, start = startPadding, end = endPadding), contentAlignment = Alignment.Center) {
-                    Text(stringResource(R.string.no_macros_msg), color = Color.Gray, textAlign = TextAlign.Center)
+                    Text(stringResource(R.string.no_macros_msg), color = mutedColor, textAlign = TextAlign.Center)
                 }
             } else {
                 val isStripeMode = keyMap.glyphPatternsViewMode == EventsViewMode.STRIPES
@@ -228,7 +250,7 @@ fun GlyphPatternsScreen(
                         start = 16.dp + startPadding, 
                         end = 16.dp + endPadding, 
                         top = topPadding + 16.dp, 
-                        bottom = inner.calculateBottomPadding() + 16.dp + (if (isLandscape) 0.dp else 120.dp)
+                        bottom = inner.calculateBottomPadding() + 16.dp + (if (isLandscape) 0.dp else (if (onBack != null) 24.dp else 120.dp))
                     ),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)

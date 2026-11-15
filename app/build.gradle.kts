@@ -13,8 +13,8 @@ android {
         applicationId = "com.HojuNK.essent_all"
         minSdk = 33
         targetSdk = 36
-        versionCode = 10
-        versionName = "0.6"
+        versionCode = 11
+        versionName = "0.6.1"
     }
 
     buildTypes {

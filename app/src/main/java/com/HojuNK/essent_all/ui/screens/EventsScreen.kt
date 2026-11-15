@@ -1,5 +1,6 @@
 package com.HojuNK.essent_all.ui.screens
 
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
@@ -162,10 +163,23 @@ fun EventsScreen(
     onSelectedCountChanged: (Int) -> Unit = {},
     onSelectAllActionChanged: (() -> Unit) -> Unit = {},
     onGroupEditActionChanged: (() -> Unit) -> Unit = {},
-    onGroupDeleteActionChanged: (() -> Unit) -> Unit = {}
+    onGroupDeleteActionChanged: (() -> Unit) -> Unit = {},
+    onBack: (() -> Unit)? = null
 ) {
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
+
+    val useDark = when (keyMap.theme) {
+        AppTheme.AUTO -> isSystemInDarkTheme()
+        AppTheme.LIGHT -> false
+        AppTheme.DARK -> true
+    }
+    val topBarBg = if (useDark) Color.Black else Color.White
+    val textColor = if (useDark) Color.White else Color.Black
+    val mutedColor = if (useDark) Color.Gray else Color.DarkGray
+    val cardBg = if (useDark) Color.Black else Color.White
+    val innerCardBg = if (useDark) Color(0xFF1A1A1A) else Color(0xFFF0F0F0)
+    val borderColor = if (useDark) Color.Gray.copy(alpha = 0.3f) else Color.LightGray
 
     var openedGroup by remember { mutableStateOf<EventGroup?>(null) }
     var targetRuleForGroup by remember { mutableStateOf<EventRule?>(null) }
@@ -292,6 +306,14 @@ fun EventsScreen(
         openedGroup = null
     }
 
+    BackHandler(enabled = onBack != null && !localSelectionMode && openedGroup == null) {
+        onBack?.invoke()
+    }
+
+    BackHandler(enabled = onBack == null && !localSelectionMode && openedGroup == null) {
+        // Do nothing when in hotbar
+    }
+
     val handleFilterToggle: (EventFilter) -> Unit = { filter ->
         selectedFilters = if (selectedFilters.contains(filter)) {
             selectedFilters - filter
@@ -362,11 +384,11 @@ fun EventsScreen(
                             if (localSelectionMode) {
                                 Text(
                                     stringResource(R.string.selected_count, selectedEventIds.size),
-                                    color = Color.White,
+                                    color = textColor,
                                     fontWeight = FontWeight.Bold
                                 )
                             } else if (currentOpenedGroup != null) {
-                                Text(currentOpenedGroup.title, color = Color.White, fontWeight = FontWeight.Bold)
+                                Text(currentOpenedGroup.title, color = textColor, fontWeight = FontWeight.Bold)
                             } else {
                                 TypewriterTitle(targetText = stringResource(R.string.events), animate = false)
                             }
@@ -374,21 +396,30 @@ fun EventsScreen(
                         navigationIcon = {
                             if (localSelectionMode) {
                                 IconButton(onClick = { updateSelectionMode(false); selectedEventIds = emptySet() }) {
-                                    Icon(Icons.Default.Close, contentDescription = null, tint = Color.White)
+                                    Icon(Icons.Default.Close, contentDescription = null, tint = textColor)
                                 }
                             } else if (currentOpenedGroup != null) {
                                 IconButton(onClick = { openedGroup = null }) {
-                                    Icon(Icons.Default.ArrowBack, contentDescription = null, tint = Color.White)
+                                    Icon(Icons.Default.ArrowBack, contentDescription = null, tint = textColor)
+                                }
+                            } else if (onBack != null) {
+                                IconButton(onClick = onBack) {
+                                    Icon(Icons.Default.ArrowBack, contentDescription = null, tint = textColor)
                                 }
                             }
                         },
-                        colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
+                        colors = TopAppBarDefaults.topAppBarColors(
+                            containerColor = Color.Transparent,
+                            actionIconContentColor = textColor,
+                            navigationIconContentColor = textColor,
+                            titleContentColor = textColor
+                        ),
                         modifier = Modifier
                             .drawBehind {
                                 val blurHeight = 45.dp.toPx()
                                 drawRect(
                                     brush = Brush.verticalGradient(
-                                        colors = listOf(Color.Black, Color.Black.copy(alpha = 0.5f)),
+                                        colors = listOf(topBarBg, topBarBg.copy(alpha = 0.5f)),
                                         startY = 0f,
                                         endY = size.height
                                     ),
@@ -396,7 +427,7 @@ fun EventsScreen(
                                 )
                                 drawRect(
                                     brush = Brush.verticalGradient(
-                                        colors = listOf(Color.Black.copy(alpha = 0.5f), Color.Transparent),
+                                        colors = listOf(topBarBg.copy(alpha = 0.5f), Color.Transparent),
                                         startY = size.height,
                                         endY = size.height + blurHeight
                                     ),
@@ -408,20 +439,20 @@ fun EventsScreen(
                             if (localSelectionMode) {
                                 val isAllSelected = activeEvents.isNotEmpty() && activeEvents.all { selectedEventIds.contains(it.id) }
                                 IconButton(onClick = handleSelectAll) {
-                                    Icon(if (isAllSelected) Icons.Default.Deselect else Icons.Default.SelectAll, null, tint = Color.White)
+                                    Icon(if (isAllSelected) Icons.Default.Deselect else Icons.Default.SelectAll, null, tint = textColor)
                                 }
                             } else {
                                 if (currentOpenedGroup != null) {
                                     IconButton(onClick = { editingGroup = currentOpenedGroup }) {
-                                        Icon(Icons.Default.Edit, null, tint = Color.White)
+                                        Icon(Icons.Default.Edit, null, tint = textColor)
                                     }
                                 } else {
                                     IconButton(onClick = onOpenPriority) {
-                                        Icon(Icons.Default.LowPriority, null, tint = Color.White)
+                                        Icon(Icons.Default.LowPriority, null, tint = textColor)
                                     }
                                 }
                                 IconButton(onClick = { updateSelectionMode(true) }) {
-                                    Icon(Icons.Default.Checklist, null, tint = Color.White)
+                                    Icon(Icons.Default.Checklist, null, tint = textColor)
                                 }
                                 Box(
                                     modifier = Modifier
@@ -438,12 +469,12 @@ fun EventsScreen(
                                     Icon(
                                         imageVector = if (keyMap.eventsViewMode == EventsViewMode.STRIPES) Icons.Default.ViewStream else Icons.Default.GridView,
                                         contentDescription = null,
-                                        tint = Color.White
+                                        tint = textColor
                                     )
                                 }
                                 if (currentOpenedGroup == null) {
                                     IconButton(onClick = onOpenSettings) {
-                                        Icon(Icons.Default.Settings, null)
+                                        Icon(Icons.Default.Settings, null, tint = textColor)
                                     }
                                 }
                             }
@@ -463,7 +494,7 @@ fun EventsScreen(
                         contentColor = Color.White,
                         modifier = Modifier
                             .padding(
-                                bottom = if (isLandscape) 24.dp else 120.dp,
+                                bottom = if (isLandscape) 24.dp else (if (onBack != null) 24.dp else 120.dp),
                                 start = if (isLandscape && rotation == ViewSurface.ROTATION_270) 135.dp else 0.dp,
                                 end = if (isLandscape && rotation == ViewSurface.ROTATION_90) 135.dp else 0.dp
                             )
@@ -508,7 +539,7 @@ fun EventsScreen(
                             start = 16.dp + startPadding, 
                             end = 16.dp + endPadding, 
                             top = topPadding + 16.dp, 
-                            bottom = inner.calculateBottomPadding() + 16.dp + (if (isLandscape) 0.dp else 120.dp)
+                            bottom = inner.calculateBottomPadding() + 16.dp + (if (isLandscape) 0.dp else (if (onBack != null) 24.dp else 120.dp))
                         )
                     ) {
                         item {
@@ -617,7 +648,7 @@ fun EventsScreen(
                             start = 16.dp + startPadding, 
                             end = 16.dp + endPadding, 
                             top = topPadding + 16.dp, 
-                            bottom = inner.calculateBottomPadding() + 16.dp + (if (isLandscape) 0.dp else 120.dp)
+                            bottom = inner.calculateBottomPadding() + 16.dp + (if (isLandscape) 0.dp else (if (onBack != null) 24.dp else 120.dp))
                         )
                     ) {
                         item {
@@ -960,6 +991,13 @@ fun EventFilterBar(
     onFilterToggle: (EventFilter) -> Unit,
     onResetToAll: () -> Unit
 ) {
+    val useDark = com.HojuNK.essent_all.LocalUseDark.current
+    val textColor = if (useDark) Color.White else Color.Black
+    val mutedColor = if (useDark) Color.Gray else Color.DarkGray
+    val cardBg = if (useDark) Color.Black else Color.White
+    val innerCardBg = if (useDark) Color(0xFF1A1A1A) else Color(0xFFF0F0F0)
+    val borderColor = if (useDark) Color.Gray.copy(alpha = 0.3f) else Color.LightGray
+
     val buttonFilters = listOf(
         EventFilter.KEY_ESSENTIAL,
         EventFilter.KEY_POWER,
@@ -995,8 +1033,8 @@ fun EventFilterBar(
                     }
                 },
                 shape = RoundedCornerShape(20.dp),
-                color = if (isSelected) Color.White else Color(0xFF2B2B2B),
-                border = if (!isSelected) BorderStroke(1.dp, Color.Gray.copy(alpha = 0.2f)) else null,
+                color = if (isSelected) textColor else innerCardBg,
+                border = if (!isSelected) BorderStroke(1.dp, borderColor) else null,
                 modifier = Modifier.height(36.dp)
             ) {
                 Row(
@@ -1005,11 +1043,11 @@ fun EventFilterBar(
                     horizontalArrangement = Arrangement.Center
                 ) {
                     if (showCross) {
-                        Icon(Icons.Default.Close, contentDescription = null, tint = Color.Gray, modifier = Modifier.size(16.dp))
+                        Icon(Icons.Default.Close, contentDescription = null, tint = mutedColor, modifier = Modifier.size(16.dp))
                     } else {
                         Text(
                             text = stringResource(filter.labelRes),
-                            color = if (isSelected) Color.Black else Color.White,
+                            color = if (isSelected) cardBg else textColor,
                             style = MaterialTheme.typography.labelMedium,
                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
                         )
@@ -1034,6 +1072,10 @@ fun SelectionBottomPanel(
     onDelete: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val useDark = com.HojuNK.essent_all.LocalUseDark.current
+    val innerCardBg = if (useDark) Color(0xFF1A1A1A) else Color(0xFFF0F0F0)
+    val borderColor = if (useDark) Color.Gray.copy(alpha = 0.3f) else Color.LightGray
+
     var panelWidth by remember { mutableStateOf(0f) }
     val rotatedModifier = when {
         isLandscape && rotation == ViewSurface.ROTATION_90 ->
@@ -1058,9 +1100,9 @@ fun SelectionBottomPanel(
     }
 
     Surface(
-        color = Color(0xFF2B2B2B),
+        color = innerCardBg,
         shape = RoundedCornerShape(50.dp),
-        border = BorderStroke(1.dp, Color.Black),
+        border = BorderStroke(1.dp, borderColor),
         modifier = rotatedModifier
             .width(344.dp)
             .height(68.dp)
@@ -1148,6 +1190,18 @@ fun StripeEventItem(
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
 
+    val useDark = when (keyMap.theme) {
+        AppTheme.AUTO -> isSystemInDarkTheme()
+        AppTheme.LIGHT -> false
+        AppTheme.DARK -> true
+    }
+    val topBarBg = if (useDark) Color.Black else Color.White
+    val textColor = if (useDark) Color.White else Color.Black
+    val mutedColor = if (useDark) Color.Gray else Color.DarkGray
+    val cardBg = if (useDark) Color.Black else Color.White
+    val innerCardBg = if (useDark) Color(0xFF1A1A1A) else Color(0xFFF0F0F0)
+    val borderColor = if (useDark) Color.Gray.copy(alpha = 0.3f) else Color.LightGray
+
     val currentRule by rememberUpdatedState(rule)
     val currentOnToggle by rememberUpdatedState(onToggle)
     val currentOnEdit by rememberUpdatedState(onEdit)
@@ -1199,15 +1253,15 @@ fun StripeEventItem(
     val itemContent = @Composable {
         Surface(
             shape = RoundedCornerShape(24.dp),
-            color = if (currentRule.isEnabled) Color(0xFF2B2B2B) else Color(0xFF101010),
+            color = if (currentRule.isEnabled) innerCardBg else (if (useDark) Color(0xFF101010) else Color(0xFFE4E4E4)),
             tonalElevation = if (currentRule.isEnabled) 2.dp else 0.dp,
-            border = if (isSelected) BorderStroke(2.dp, Color.White) else if (!currentRule.isEnabled) BorderStroke(1.dp, Color.Gray.copy(alpha = 0.15f)) else null,
+            border = if (isSelected) BorderStroke(2.dp, textColor) else if (!currentRule.isEnabled) BorderStroke(1.dp, borderColor) else null,
             modifier = Modifier.fillMaxSize()
         ) {
             Row(modifier = Modifier.padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
                 EventIconDisplay(currentRule.icon, displaySize = 42.dp, grayscale = !currentRule.isEnabled)
                 Spacer(Modifier.width(16.dp))
-                Text(currentRule.title, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge, color = if (currentRule.isEnabled) Color.White else Color.Gray)
+                Text(currentRule.title, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge, color = if (currentRule.isEnabled) textColor else mutedColor)
                 if (isSelectionMode) {
                     Checkbox(checked = isSelected, onCheckedChange = { onSelectToggle() })
                 } else {
@@ -1391,6 +1445,18 @@ fun RectangleEventItem(
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
 
+    val useDark = when (keyMap.theme) {
+        AppTheme.AUTO -> isSystemInDarkTheme()
+        AppTheme.LIGHT -> false
+        AppTheme.DARK -> true
+    }
+    val topBarBg = if (useDark) Color.Black else Color.White
+    val textColor = if (useDark) Color.White else Color.Black
+    val mutedColor = if (useDark) Color.Gray else Color.DarkGray
+    val cardBg = if (useDark) Color.Black else Color.White
+    val innerCardBg = if (useDark) Color(0xFF1A1A1A) else Color(0xFFF0F0F0)
+    val borderColor = if (useDark) Color.Gray.copy(alpha = 0.3f) else Color.LightGray
+
     val currentRule by rememberUpdatedState(rule)
     val currentOnToggle by rememberUpdatedState(onToggle)
     val currentOnEdit by rememberUpdatedState(onEdit)
@@ -1427,9 +1493,9 @@ fun RectangleEventItem(
     val itemContent = @Composable {
         Surface(
             shape = RoundedCornerShape(24.dp),
-            color = if (currentRule.isEnabled) Color(0xFF2B2B2B) else Color(0xFF101010),
+            color = if (currentRule.isEnabled) innerCardBg else (if (useDark) Color(0xFF101010) else Color(0xFFE4E4E4)),
             tonalElevation = if (currentRule.isEnabled) 2.dp else 0.dp,
-            border = if (isSelected) BorderStroke(2.dp, Color.White) else if (!currentRule.isEnabled) BorderStroke(1.dp, Color.Gray.copy(alpha = 0.15f)) else null,
+            border = if (isSelected) BorderStroke(2.dp, textColor) else if (!currentRule.isEnabled) BorderStroke(1.dp, borderColor) else null,
             modifier = Modifier.fillMaxSize()
         ) {
             Box(modifier = Modifier.fillMaxSize()) {
@@ -1454,12 +1520,12 @@ fun RectangleEventItem(
                     Text(
                         currentRule.title,
                         style = MaterialTheme.typography.titleMedium.copy(lineHeight = 24.sp),
-                        color = if (currentRule.isEnabled) Color.White else Color.Gray,
+                        color = if (currentRule.isEnabled) textColor else mutedColor,
                         textAlign = TextAlign.Center,
                         fontWeight = FontWeight.Bold
                     )
                     if (!currentRule.isEnabled && !isSelectionMode) {
-                        Text(stringResource(R.string.state_off_label), style = MaterialTheme.typography.labelSmall, color = Color.Gray.copy(alpha = 0.4f))
+                        Text(stringResource(R.string.state_off_label), style = MaterialTheme.typography.labelSmall, color = mutedColor.copy(alpha = 0.5f))
                     }
                 }
             }

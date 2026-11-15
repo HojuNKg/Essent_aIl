@@ -58,6 +58,14 @@ fun ButtonActionsScreen(
     val translateY = predictiveBackProgress * screenHeightPx
     val scaleVal = 1f - predictiveBackProgress * 0.08f
 
+    val useDark = com.HojuNK.essent_all.LocalUseDark.current
+    val topBarBg = if (useDark) Color.Black else Color.White
+    val textColor = if (useDark) Color.White else Color.Black
+    val mutedColor = if (useDark) Color.Gray else Color.DarkGray
+    val cardBg = if (useDark) Color.Black else Color.White
+    val innerCardBg = if (useDark) Color(0xFF1A1A1A) else Color(0xFFF0F0F0)
+    val borderColor = if (useDark) Color.Gray.copy(alpha = 0.3f) else Color.LightGray
+
     Scaffold(
         modifier = Modifier
             .fillMaxSize()
@@ -71,16 +79,21 @@ fun ButtonActionsScreen(
             },
         topBar = {
             TopAppBar(
-                title = { Text(title, color = Color.White) },
+                title = { Text(title, color = textColor) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, null, tint = Color.White)
+                        Icon(Icons.Default.ArrowBack, null, tint = textColor)
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Black)
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = topBarBg,
+                    titleContentColor = textColor,
+                    navigationIconContentColor = textColor,
+                    actionIconContentColor = textColor
+                )
             )
         },
-        containerColor = Color.Black
+        containerColor = topBarBg
     ) { inner ->
         LazyColumn(
             modifier = Modifier
@@ -95,18 +108,18 @@ fun ButtonActionsScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .aspectRatio(3f / 2f)
-                        .background(Color(0xFF1A1A1A), RoundedCornerShape(24.dp))
-                        .border(2.dp, Color.Gray.copy(alpha = 0.3f), RoundedCornerShape(24.dp)),
+                        .background(innerCardBg, RoundedCornerShape(24.dp))
+                        .border(2.dp, borderColor, RoundedCornerShape(24.dp)),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("Stub 3:2", color = Color.Gray, style = MaterialTheme.typography.titleMedium)
+                    Text("Stub 3:2", color = mutedColor, style = MaterialTheme.typography.titleMedium)
                 }
             }
 
             // 2. Gesture Selector (HorizontalPager format from Event Editor)
             item {
                 Column {
-                    Text(stringResource(R.string.when_gesture_exec), color = Color.White, style = MaterialTheme.typography.labelLarge)
+                    Text(stringResource(R.string.when_gesture_exec), color = textColor, style = MaterialTheme.typography.labelLarge)
                     Spacer(Modifier.height(12.dp))
                     val initialPage = slots.indexOf(selectedSlot).coerceAtLeast(0)
                     val pagerState = rememberPagerState(initialPage = initialPage) { slots.size }
@@ -126,12 +139,12 @@ fun ButtonActionsScreen(
                         val slot = slots[page]
                         val isSelected = selectedSlot == slot
                         Surface(
-                            color = if (isSelected) Color(0xFF2B2B2B) else Color(0xFF1A1A1A),
+                            color = if (isSelected) (if (useDark) Color(0xFF2B2B2B) else Color(0xFFE0E0E0)) else innerCardBg,
                             shape = RoundedCornerShape(28.dp),
-                            modifier = Modifier.fillMaxSize().border(2.dp, if (isSelected) Color.White else Color.Gray.copy(alpha = 0.3f), RoundedCornerShape(28.dp))
+                            modifier = Modifier.fillMaxSize().border(2.dp, if (isSelected) textColor else borderColor, RoundedCornerShape(28.dp))
                         ) {
                             Box(contentAlignment = Alignment.Center) {
-                                Text(stringResource(slot.labelRes), color = Color.White, style = MaterialTheme.typography.titleMedium)
+                                Text(stringResource(slot.labelRes), color = textColor, style = MaterialTheme.typography.titleMedium)
                             }
                         }
                     }
@@ -140,7 +153,7 @@ fun ButtonActionsScreen(
 
             // 3. Action configuration for the selectedSlot in this block
             item {
-                HorizontalDivider(color = Color.Gray.copy(alpha = 0.3f))
+                HorizontalDivider(color = borderColor)
                 Spacer(Modifier.height(8.dp))
                 SlotRowComposable(
                     slot = selectedSlot,
@@ -203,8 +216,8 @@ fun ButtonActionsScreen(
     if (showAssistantPermissionDialog) {
         AlertDialog(
             onDismissRequest = { showAssistantPermissionDialog = false },
-            title = { Text(stringResource(R.string.assistant_permission_title), color = Color.White) },
-            text = { Text(stringResource(R.string.assistant_permission_msg), color = Color.Gray) },
+            title = { Text(stringResource(R.string.assistant_permission_title), color = textColor) },
+            text = { Text(stringResource(R.string.assistant_permission_msg), color = mutedColor) },
             confirmButton = {
                 TextButton(onClick = {
                     showAssistantPermissionDialog = false
@@ -215,10 +228,10 @@ fun ButtonActionsScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showAssistantPermissionDialog = false }) {
-                    Text(stringResource(android.R.string.cancel), color = Color.Gray)
+                    Text(stringResource(android.R.string.cancel), color = mutedColor)
                 }
             },
-            containerColor = Color(0xFF1A1A1A)
+            containerColor = innerCardBg
         )
     }
 

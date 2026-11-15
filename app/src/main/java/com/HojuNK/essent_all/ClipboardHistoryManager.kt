@@ -23,6 +23,8 @@ object ClipboardHistoryManager {
     private const val KEY_HISTORY = "clipboard_history_list"
     private const val MAX_ITEMS = 50
 
+    val historyUpdatedFlow = kotlinx.coroutines.flow.MutableSharedFlow<Unit>(replay = 1, extraBufferCapacity = 10)
+
     fun getHistory(context: Context): List<ClipboardItem> {
         val prefs = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
         val jsonStr = prefs.getString(KEY_HISTORY, null) ?: return emptyList()
@@ -63,6 +65,7 @@ object ClipboardHistoryManager {
             arr.put(obj)
         }
         prefs.edit().putString(KEY_HISTORY, arr.toString()).apply()
+        historyUpdatedFlow.tryEmit(Unit)
     }
 
     fun addItemAndGetId(context: Context, content: String, type: String = "text", isNote: Boolean = false): String {
@@ -114,11 +117,17 @@ object ClipboardHistoryManager {
                 val text = item.text?.toString()
                 val uri = item.uri
                 if (!text.isNullOrBlank()) {
-                    addItem(context, text, "text")
-                    return true
+                    val history = getHistory(context)
+                    if (history.none { it.content == text }) {
+                        addItem(context, text, "text")
+                        return true
+                    }
                 } else if (uri != null) {
-                    addItem(context, uri.toString(), "image")
-                    return true
+                    val history = getHistory(context)
+                    if (history.none { it.content == uri.toString() }) {
+                        addItem(context, uri.toString(), "image")
+                        return true
+                    }
                 }
             }
         } catch (e: Exception) {
@@ -137,7 +146,8 @@ object ClipboardHistoryManager {
         val current = getHistory(context).toMutableList()
         val index = current.indexOfFirst { it.id == updatedItem.id }
         if (index != -1) {
-            current[index] = updatedItem
+            val originalTimestamp = current[index].timestamp
+            current[index] = updatedItem.copy(timestamp = originalTimestamp)
             saveHistory(context, current)
         } else {
             addItem(context, updatedItem.content, updatedItem.type)

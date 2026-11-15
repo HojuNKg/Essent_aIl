@@ -405,6 +405,9 @@ fun EventIconDisplay(
             }
     } else Modifier
 
+    val useDark = com.HojuNK.essent_all.LocalUseDark.current
+    val iconColor = if (grayscale) Color.Gray else (if (useDark) Color.White else Color.Black)
+
     val finalModifier = if (modifier == Modifier) Modifier.size(displaySize) else modifier
 
     BoxWithConstraints(modifier = finalModifier.then(filterModifier), contentAlignment = Alignment.Center) {
@@ -412,7 +415,7 @@ fun EventIconDisplay(
             Icon(
                 imageVector = materialIcon,
                 contentDescription = null,
-                tint = if (grayscale) Color.Gray else Color.White,
+                tint = iconColor,
                 modifier = Modifier.fillMaxSize()
             )
         } else if (appIcon != null) {
@@ -426,7 +429,7 @@ fun EventIconDisplay(
             Text(
                 icon,
                 fontSize = (effectiveSize.value * 0.75f).sp,
-                color = if (grayscale) Color.Gray else Color.White
+                color = iconColor
             )
         }
     }

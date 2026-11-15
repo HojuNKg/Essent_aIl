@@ -52,6 +52,9 @@ import androidx.lifecycle.ViewModelStore
 import androidx.lifecycle.ViewModelStoreOwner
 import androidx.lifecycle.setViewTreeLifecycleOwner
 import androidx.lifecycle.setViewTreeViewModelStoreOwner
+import androidx.activity.OnBackPressedDispatcher
+import androidx.activity.OnBackPressedDispatcherOwner
+import androidx.activity.setViewTreeOnBackPressedDispatcherOwner
 import androidx.savedstate.SavedStateRegistry
 import androidx.savedstate.SavedStateRegistryController
 import androidx.savedstate.SavedStateRegistryOwner
@@ -280,6 +283,9 @@ class EssentialKeyService : AccessibilityService(), LifecycleOwner, ViewModelSto
     override fun onKeyEvent(event: KeyEvent): Boolean {
         try {
             val config = currentKeyMap ?: Config.readBlocking(this)
+            if (!config.isKeyRemappingEnabled) {
+                return false
+            }
 
             if (event.keyCode == KeyEvent.KEYCODE_VOLUME_UP) {
                 val hasVolUp = config.hasAnyActionOrEvent(
@@ -452,6 +458,7 @@ class EssentialKeyService : AccessibilityService(), LifecycleOwner, ViewModelSto
             if (slot == null) return
 
             val keyMap = currentKeyMap ?: Config.readBlocking(this)
+            if (!keyMap.isKeyRemappingEnabled) return
             
             // 1. Unified Analysis: Pre-analyze if an action is about to happen
             val activePkg = rootInActiveWindow?.packageName?.toString() ?: ""
@@ -2443,14 +2450,16 @@ class EssentialKeyService : AccessibilityService(), LifecycleOwner, ViewModelSto
                         }
                     },
                     onKeyboardFocusRequested = { needsFocus ->
-                        if (needsFocus) {
-                            params.flags = params.flags and WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE.inv()
-                        } else {
-                            params.flags = params.flags or WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+                        Handler(Looper.getMainLooper()).post {
+                            if (needsFocus) {
+                                params.flags = params.flags and WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE.inv()
+                            } else {
+                                params.flags = params.flags or WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+                            }
+                            try {
+                                windowManager.updateViewLayout(composeView, params)
+                            } catch (e: Exception) {}
                         }
-                        try {
-                            windowManager.updateViewLayout(composeView, params)
-                        } catch (e: Exception) {}
                     },
                     onToggleCustomizableMode = { active ->
                         if (active) {

@@ -5,6 +5,7 @@ import android.content.pm.ActivityInfo
 import android.os.Bundle
 import android.provider.Settings
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.PredictiveBackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -60,6 +61,8 @@ import kotlin.math.abs
 import kotlinx.coroutines.withContext
 import java.util.UUID
 import kotlin.math.absoluteValue
+
+val LocalUseDark = compositionLocalOf { true }
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -125,9 +128,14 @@ fun MainContent(intent: Intent) {
     var isEventsSelectionMode by remember { mutableStateOf(false) }
     var isMacrosSelectionMode by remember { mutableStateOf(false) }
     var isGlyphsSelectionMode by remember { mutableStateOf(false) }
+    var isNotesSelectionMode by remember { mutableStateOf(false) }
+    var isNotesSearchActive by remember { mutableStateOf(false) }
+    var isMoreSubScreenActive by remember { mutableStateOf(false) }
     var openedGroupId by remember { mutableStateOf<String?>(null) }
     var selectedEventsCount by remember { mutableStateOf(0) }
+    var selectedNotesCount by remember { mutableStateOf(0) }
     var landscapeSelectAllAction by remember { mutableStateOf<(() -> Unit)?>(null) }
+    var landscapeSelectNotesAllAction by remember { mutableStateOf<(() -> Unit)?>(null) }
     var landscapeGroupAction by remember { mutableStateOf<EventGroup?>(null) }
     var landscapeGroupEditAction by remember { mutableStateOf<(() -> Unit)?>(null) }
     var landscapeGroupDeleteAction by remember { mutableStateOf<(() -> Unit)?>(null) }
@@ -219,25 +227,54 @@ fun MainContent(intent: Intent) {
     val colorScheme = if (useDark) {
         darkColorScheme(primary = Color.White, onPrimary = Color.Black, surface = Color.Black, onSurface = Color.White, background = Color.Black, onBackground = Color.White)
     } else {
-        lightColorScheme(primary = Color.Black, onPrimary = Color.White)
+        lightColorScheme(
+            primary = Color.Black,
+            onPrimary = Color.White,
+            surface = Color.White,
+            onSurface = Color.Black,
+            background = Color.White,
+            onBackground = Color.Black,
+            secondary = Color(0xFF333333),
+            onSecondary = Color.White
+        )
     }
     
     CompositionLocalProvider(
         LocalRadialMenu provides { radialMenuState = it },
         LocalRadialMenuState provides radialMenuState,
-        LocalOrientationLock provides { forcePortrait = it }
+        LocalOrientationLock provides { forcePortrait = it },
+        LocalUseDark provides useDark
     ) {
         MaterialTheme(colorScheme = colorScheme) {
-            Surface(modifier = Modifier.fillMaxSize(), color = Color.Black) {
-                val pagerState = rememberPagerState { NavScreen.entries.size }
+            Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+                val pendingMiddleScreens = remember(keyMap.hotbarMiddleScreens) { mutableStateOf(keyMap.hotbarMiddleScreens) }
+                var isEditingHotbar by remember { mutableStateOf(false) }
+                var selectedEditSlot by remember { mutableStateOf(1) } // 1 or 2
+
+                val currentMiddleScreens = if (isEditingHotbar) pendingMiddleScreens.value else keyMap.hotbarMiddleScreens
+                val hotbarScreens = remember(currentMiddleScreens) {
+                    listOf(NavScreen.KEY) + currentMiddleScreens + listOf(NavScreen.MORE)
+                }
+
+                val pagerState = rememberPagerState { hotbarScreens.size }
                 val isAppLoading = loadingStage != LoadingStage.FULLY_LOADED && loadingStage != LoadingStage.TRANSITIONING
-                val anyEditorVisible = showSettings || recordedMacroActions != null || editingMacro != null || editingEvent != null || editingGlyphPattern != null || editSlot != null || activeBlockDetail != null || showEventPriority || forcePortrait
+                var isNotesEditorOpen by remember { mutableStateOf(false) }
+                val anyEditorVisible = showSettings || recordedMacroActions != null || editingMacro != null || editingEvent != null || editingGlyphPattern != null || editSlot != null || activeBlockDetail != null || showEventPriority || forcePortrait || isNotesEditorOpen
                 var isActionPickerOpen by remember { mutableStateOf(false) }
-                val currentScreen = NavScreen.entries[pagerState.currentPage]
+                val currentScreen = hotbarScreens.getOrElse(pagerState.currentPage) { NavScreen.MORE }
                 val isSelectionActive = (currentScreen == NavScreen.EVENTS && isEventsSelectionMode) ||
                                         (currentScreen == NavScreen.MACROS && isMacrosSelectionMode) ||
-                                        (currentScreen == NavScreen.GAMES && isGlyphsSelectionMode)
-                val isHotbarHidden = isAppLoading || anyEditorVisible || isActionPickerOpen || isSelectionActive
+                                        (currentScreen == NavScreen.GLYPHS && isGlyphsSelectionMode) ||
+                                        (currentScreen == NavScreen.NOTES && isNotesSelectionMode) ||
+                                        (currentScreen == NavScreen.MORE && isGlyphsSelectionMode)
+                val isHotbarHidden = (isAppLoading || anyEditorVisible || isActionPickerOpen || isSelectionActive || isMoreSubScreenActive) && !isEditingHotbar
+
+                BackHandler(enabled = isEditingHotbar) {
+                    scope.launch {
+                        Config.setHotbarMiddleScreens(ctx, pendingMiddleScreens.value)
+                    }
+                    isEditingHotbar = false
+                }
 
                 var predictiveBackTarget by remember { mutableStateOf<String?>(null) }
                 var lastPredictiveBackTarget by remember { mutableStateOf<String?>(null) }
@@ -298,7 +335,7 @@ fun MainContent(intent: Intent) {
 
                 // Основной контейнер оверлеев
                 Box(modifier = Modifier.fillMaxSize()) {
-                    val currentScreen = NavScreen.entries[pagerState.currentPage]
+                    val currentScreen = hotbarScreens.getOrElse(pagerState.currentPage) { NavScreen.MORE }
                     var hotbarWidth by remember { mutableStateOf(0f) }
                     var headerWidth by remember { mutableStateOf(0f) }
                     
@@ -326,7 +363,7 @@ fun MainContent(intent: Intent) {
                     // 1. Контент (HorizontalPager) - Самый нижний слой в Box
                     HorizontalPager(
                         state = pagerState,
-                        userScrollEnabled = loadingStage == LoadingStage.FULLY_LOADED && !isHotbarHidden,
+                        userScrollEnabled = loadingStage == LoadingStage.FULLY_LOADED && !isHotbarHidden && !isMoreSubScreenActive && !isEditingHotbar,
                         modifier = Modifier.fillMaxSize()
                             .graphicsLayer {
                                 val currentScale = dragDepth
@@ -350,7 +387,7 @@ fun MainContent(intent: Intent) {
                                 }
                             }
                     ) { page ->
-                        val screen = NavScreen.entries[page]
+                        val screen = hotbarScreens.getOrElse(page) { NavScreen.MORE }
                         
                         // Скрываем промежуточные страницы при "прыжках" через пункты хотбара
                         val isIntermediary = remember(isTabClicking.value, jumpSource.value, jumpTarget.value, page) {
@@ -416,14 +453,74 @@ fun MainContent(intent: Intent) {
                                     isSelectionMode = isMacrosSelectionMode,
                                     onSelectionModeChange = { isMacrosSelectionMode = it }
                                 )
-                                NavScreen.GAMES -> GlyphPatternsScreen(
+                                NavScreen.GLYPHS -> GlyphPatternsScreen(
+                                    keyMap = keyMap,
+                                    apps = apps,
+                                    onOpenSettings = { showSettings = true },
+                                    onEditPattern = { editingGlyphPattern = it },
+                                    onShowAccessibilityError = { showAccessibilityError = true },
+                                    isSelectionMode = isGlyphsSelectionMode,
+                                    onSelectionModeChange = { isGlyphsSelectionMode = it }
+                                )
+                                NavScreen.NOTES -> NotesScreen(
+                                    keyMap = keyMap,
+                                    apps = apps,
+                                    onOpenSettings = { showSettings = true },
+                                    onShowAccessibilityError = { showAccessibilityError = true },
+                                    onBack = null,
+                                    onEditorToggle = { isNotesEditorOpen = it },
+                                    isSelectionMode = isNotesSelectionMode,
+                                    onSelectionModeChange = { isNotesSelectionMode = it },
+                                    onSelectedCountChanged = { selectedNotesCount = it },
+                                    onSelectAllActionChanged = { landscapeSelectNotesAllAction = it },
+                                    isSearchActive = isNotesSearchActive,
+                                    onSearchActiveChange = { isNotesSearchActive = it }
+                                )
+                                NavScreen.MORE -> MoreScreen(
                                     keyMap = keyMap, 
                                     apps = apps, 
                                     onOpenSettings = { showSettings = true }, 
                                     onEditPattern = { editingGlyphPattern = it },
                                     onShowAccessibilityError = { showAccessibilityError = true },
                                     isSelectionMode = isGlyphsSelectionMode,
-                                    onSelectionModeChange = { isGlyphsSelectionMode = it }
+                                    onSelectionModeChange = { isGlyphsSelectionMode = it },
+                                    onSubScreenChanged = { isMoreSubScreenActive = it },
+                                    onNotesEditorToggle = { isNotesEditorOpen = it },
+                                    isNotesSelectionMode = isNotesSelectionMode,
+                                    onNotesSelectionModeChange = { isNotesSelectionMode = it },
+                                    onNotesSelectedCountChanged = { selectedNotesCount = it },
+                                    onNotesSelectAllActionChanged = { landscapeSelectNotesAllAction = it },
+                                    isNotesSearchActive = isNotesSearchActive,
+                                    onNotesSearchActiveChange = { isNotesSearchActive = it },
+                                    isEditingHotbar = isEditingHotbar,
+                                    onToggleEditHotbar = {
+                                        if (isEditingHotbar) {
+                                            scope.launch {
+                                                Config.setHotbarMiddleScreens(ctx, pendingMiddleScreens.value)
+                                            }
+                                            isEditingHotbar = false
+                                        } else {
+                                            pendingMiddleScreens.value = keyMap.hotbarMiddleScreens
+                                            selectedEditSlot = 1
+                                            isEditingHotbar = true
+                                        }
+                                    },
+                                    hotbarMiddleScreens = currentMiddleScreens,
+                                    onSwapScreen = { targetScreen ->
+                                        val activeList = pendingMiddleScreens.value.toMutableList()
+                                        val targetIndex = (selectedEditSlot - 1).coerceIn(0, 1)
+                                        if (targetIndex in activeList.indices) {
+                                            activeList[targetIndex] = targetScreen
+                                            pendingMiddleScreens.value = activeList
+                                        }
+                                    },
+                                    onEditEvent = { editingEvent = it },
+                                    onOpenPriority = { showEventPriority = true },
+                                    onEditMacro = { editingMacro = it },
+                                    isEventsSelectionMode = isEventsSelectionMode,
+                                    onEventsSelectionModeChange = { isEventsSelectionMode = it },
+                                    isMacrosSelectionMode = isMacrosSelectionMode,
+                                    onMacrosSelectionModeChange = { isMacrosSelectionMode = it }
                                 )
                             }
                         }
@@ -500,8 +597,30 @@ fun MainContent(intent: Intent) {
                                             OrientationRotatable { Icon(Icons.Default.Settings, null, tint = Color.White) }
                                         }
                                     }
+                                } else if (currentScreen == NavScreen.NOTES && isNotesSelectionMode) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        IconButton(onClick = { isNotesSelectionMode = false }) {
+                                            OrientationRotatable { Icon(Icons.Default.Close, null, tint = Color.White) }
+                                        }
+                                        Spacer(Modifier.width(8.dp))
+                                        Text(
+                                            stringResource(R.string.selected_count, selectedNotesCount),
+                                            color = Color.White,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                    IconButton(onClick = { landscapeSelectNotesAllAction?.invoke() }) {
+                                        OrientationRotatable { Icon(Icons.Default.SelectAll, null, tint = Color.White) }
+                                    }
                                 } else {
-                                    TypewriterTitle(animate = currentScreen == NavScreen.KEY)
+                                    when (currentScreen) {
+                                        NavScreen.KEY -> TypewriterTitle(animate = true)
+                                        NavScreen.EVENTS -> TypewriterTitle(targetText = stringResource(R.string.events), animate = false)
+                                        NavScreen.MACROS -> TypewriterTitle(targetText = stringResource(R.string.nav_macros), animate = false)
+                                        NavScreen.GLYPHS -> TypewriterTitle(targetText = stringResource(R.string.games_title), animate = false)
+                                        NavScreen.NOTES -> TypewriterTitle(targetText = "Заметки", animate = false)
+                                        NavScreen.MORE -> TypewriterTitle(targetText = stringResource(R.string.nav_more), animate = false)
+                                    }
                                     Row(verticalAlignment = Alignment.CenterVertically) {
                                         if (currentScreen == NavScreen.EVENTS) {
                                             IconButton(onClick = { showEventPriority = true }) {
@@ -525,18 +644,18 @@ fun MainContent(intent: Intent) {
                                                 OrientationRotatable { Icon(if (keyMap.macrosViewMode == EventsViewMode.STRIPES) Icons.Default.ViewStream else Icons.Default.GridView, null, tint = Color.White) }
                                             }
                                         }
-                                        val glyphActive by GlyphController.glyphActive.collectAsState()
-                                        if (currentScreen == NavScreen.GAMES) {
+                                        if (currentScreen == NavScreen.NOTES) {
+                                            IconButton(onClick = { isNotesSelectionMode = !isNotesSelectionMode }) {
+                                                OrientationRotatable { Icon(Icons.Default.Checklist, null, tint = Color.White) }
+                                            }
                                             IconButton(onClick = {
-                                                GlyphController.toggleGlyph()
+                                                val nextMode = if (keyMap.notesViewMode == EventsViewMode.STRIPES) EventsViewMode.RECTANGLES else EventsViewMode.STRIPES
+                                                scope.launch { Config.setNotesViewMode(ctx, nextMode) }
                                             }) {
-                                                OrientationRotatable { 
-                                                    Icon(
-                                                        Icons.Default.Lightbulb, 
-                                                        null, 
-                                                        tint = if (glyphActive) Color(0xFFFFD700) else Color.White
-                                                    ) 
-                                                }
+                                                OrientationRotatable { Icon(if (keyMap.notesViewMode == EventsViewMode.STRIPES) Icons.Default.ViewStream else Icons.Default.GridView, null, tint = Color.White) }
+                                            }
+                                            IconButton(onClick = { isNotesSearchActive = !isNotesSearchActive }) {
+                                                OrientationRotatable { Icon(Icons.Default.Search, null, tint = Color.White) }
                                             }
                                         }
                                         IconButton(onClick = { showSettings = true }) {
@@ -559,6 +678,7 @@ fun MainContent(intent: Intent) {
                     )
 
                     if (!isLandscape && hotbarBgAlpha > 0.001f) {
+                        val bgCol = if (useDark) Color.Black else Color.White
                         Box(
                             modifier = Modifier
                                 .align(Alignment.BottomCenter)
@@ -571,7 +691,7 @@ fun MainContent(intent: Intent) {
                                     // Верхняя размытая часть (переход от прозрачного к полутемному)
                                     drawRect(
                                         brush = Brush.verticalGradient(
-                                            colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.5f)),
+                                            colors = listOf(Color.Transparent, bgCol.copy(alpha = 0.5f)),
                                             startY = 0f,
                                             endY = blurHeight
                                         ),
@@ -580,7 +700,7 @@ fun MainContent(intent: Intent) {
                                     // Нижняя плотная часть (от полутемного к глухому черному)
                                     drawRect(
                                         brush = Brush.verticalGradient(
-                                            colors = listOf(Color.Black.copy(alpha = 0.5f), Color.Black),
+                                            colors = listOf(bgCol.copy(alpha = 0.5f), bgCol),
                                             startY = blurHeight,
                                             endY = size.height
                                         ),
@@ -599,21 +719,26 @@ fun MainContent(intent: Intent) {
                         loadingStage = loadingStage,
                         isDragging = isDraggingHotbar.value,
                         isHidden = isHotbarHidden,
+                        screens = hotbarScreens,
+                        isEditing = isEditingHotbar,
+                        selectedEditSlot = selectedEditSlot,
+                        onSelectEditSlot = { selectedEditSlot = it },
                         onScreenSelected = { screen ->
-                            if (!isHotbarHidden) {
+                            if (!isHotbarHidden && !isEditingHotbar) {
+                                val targetIndex = hotbarScreens.indexOf(screen).takeIf { it >= 0 } ?: 0
                                 scope.launch { 
                                     jumpSource.value = pagerState.currentPage
-                                    jumpTarget.value = screen.ordinal
+                                    jumpTarget.value = targetIndex
                                     isTabClicking.value = true
                                     launch {
                                         visualPagerPosition.animateTo(
-                                            screen.ordinal.toFloat(),
+                                            targetIndex.toFloat(),
                                             animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow)
                                         )
                                     }
                                     launch {
                                         pagerState.animateScrollToPage(
-                                            screen.ordinal,
+                                            targetIndex,
                                             animationSpec = tween(durationMillis = 500, easing = FastOutSlowInEasing)
                                         )
                                         isTabClicking.value = false
@@ -622,7 +747,7 @@ fun MainContent(intent: Intent) {
                             }
                         },
                         onDrag = { delta ->
-                            if (!isHotbarHidden) {
+                            if (!isHotbarHidden && !isEditingHotbar) {
                                 isDraggingHotbar.value = true
                                 // 1. Ширина страницы в ландшафте меньше на 140dp из-за паддингов
                                 val sidePaddingPx = if (isLandscape) with(density) { 70.dp.toPx() } else 0f
@@ -642,11 +767,11 @@ fun MainContent(intent: Intent) {
                             }
                         },
                         onDragEnd = {
-                            if (!isHotbarHidden) {
+                            if (!isHotbarHidden && !isEditingHotbar) {
                                 isDraggingHotbar.value = false
                                 scope.launch {
                                     val targetPage = (pagerState.currentPage + pagerState.currentPageOffsetFraction + 0.5f).toInt()
-                                        .coerceIn(0, NavScreen.entries.size - 1)
+                                        .coerceIn(0, hotbarScreens.size - 1)
                                     pagerState.animateScrollToPage(targetPage)
                                 }
                             }

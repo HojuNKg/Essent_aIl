@@ -43,6 +43,14 @@ fun SettingsScreen(keyMap: KeyMap, onBack: () -> Unit) {
     var isDraggingSlider by remember { mutableStateOf(false) }
     var previewYOffset by remember { mutableFloatStateOf(keyMap.panelYOffset) }
 
+    val useDark = com.HojuNK.essent_all.LocalUseDark.current
+    val topBarBg = if (useDark) Color.Black else Color.White
+    val textColor = if (useDark) Color.White else Color.Black
+    val mutedColor = if (useDark) Color.Gray else Color.DarkGray
+    val cardBg = if (useDark) Color(0xFF2A2A2A) else Color(0xFFF0F0F0)
+    val dialogBg = if (useDark) Color(0xFF121212) else Color.White
+    val borderColor = if (useDark) Color.Gray else Color.LightGray
+
     LaunchedEffect(keyMap.panelYOffset) {
         if (!isDraggingSlider) previewYOffset = keyMap.panelYOffset
     }
@@ -77,9 +85,16 @@ fun SettingsScreen(keyMap: KeyMap, onBack: () -> Unit) {
             topBar = {
                 TopAppBar(
                     title = { TypewriterTitle(targetText = stringResource(R.string.settings), animate = false) },
-                    navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) } }
+                    navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = textColor) } },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = topBarBg,
+                        titleContentColor = textColor,
+                        navigationIconContentColor = textColor,
+                        actionIconContentColor = textColor
+                    )
                 )
-            }
+            },
+            containerColor = topBarBg
         ) { inner ->
             LazyColumn(modifier = Modifier.fillMaxSize().padding(inner).padding(16.dp), verticalArrangement = Arrangement.spacedBy(24.dp)) {
             item { OutlinedButton(onClick = { openAccessibilitySettings(ctx) }, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.accessibility_settings)) } }
@@ -121,9 +136,9 @@ fun SettingsScreen(keyMap: KeyMap, onBack: () -> Unit) {
                     OutlinedButton(
                         onClick = { showLangDialog = true },
                         modifier = Modifier.fillMaxWidth(),
-                        border = BorderStroke(1.dp, Color.Gray)
+                        border = BorderStroke(1.dp, borderColor)
                     ) {
-                        Text(currentLanguage.getLabel(ctx))
+                        Text(currentLanguage.getLabel(ctx), color = textColor)
                     }
 
                     if (showLangDialog) {
@@ -163,7 +178,7 @@ fun SettingsScreen(keyMap: KeyMap, onBack: () -> Unit) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Bottom) {
                         Text(stringResource(R.string.y_offset), style = MaterialTheme.typography.labelMedium)
-                        Text("${(previewYOffset * 100).toInt()}%", style = MaterialTheme.typography.bodySmall, color = Color.White)
+                        Text("${(previewYOffset * 100).toInt()}%", style = MaterialTheme.typography.bodySmall, color = textColor)
                     }
                     Slider(
                         value = previewYOffset,
@@ -175,7 +190,7 @@ fun SettingsScreen(keyMap: KeyMap, onBack: () -> Unit) {
                             isDraggingSlider = false
                             scope.launch { Config.setPanelConfig(ctx, keyMap.panelSide, previewYOffset) }
                         },
-                        colors = SliderDefaults.colors(thumbColor = Color.White, activeTrackColor = Color.White)
+                        colors = SliderDefaults.colors(thumbColor = textColor, activeTrackColor = textColor)
                     )
                 }
             }
@@ -247,7 +262,7 @@ fun SettingsScreen(keyMap: KeyMap, onBack: () -> Unit) {
                                 }
                             }
                         ),
-                    color = Color(0xFF2A2A2A),
+                    color = cardBg,
                     shape = RoundedCornerShape(16.dp),
                     border = BorderStroke(1.dp, Color(0xFFFFD700))
                 ) {
@@ -259,8 +274,8 @@ fun SettingsScreen(keyMap: KeyMap, onBack: () -> Unit) {
                         Column {
                             Text("🧪 Отладочная тест-кнопка", color = Color(0xFFFFD700), style = MaterialTheme.typography.titleSmall)
                             Spacer(Modifier.height(4.dp))
-                            Text("Выбрано: $actionTitle", color = Color.White, style = MaterialTheme.typography.bodyMedium)
-                            Text("Тап: выбрать. Зажатие: выполнить", color = Color.Gray, style = MaterialTheme.typography.bodySmall)
+                            Text("Выбрано: $actionTitle", color = textColor, style = MaterialTheme.typography.bodyMedium)
+                            Text("Тап: выбрать. Зажатие: выполнить", color = mutedColor, style = MaterialTheme.typography.bodySmall)
                         }
                         Icon(Icons.Default.Settings, null, tint = Color(0xFFFFD700))
                     }
@@ -273,13 +288,13 @@ fun SettingsScreen(keyMap: KeyMap, onBack: () -> Unit) {
                     ) {
                         Surface(
                             shape = RoundedCornerShape(16.dp),
-                            color = Color(0xFF121212),
+                            color = dialogBg,
                             modifier = Modifier
                                 .fillMaxWidth(0.96f)
                                 .fillMaxHeight(0.85f)
                         ) {
                             Column(Modifier.padding(16.dp)) {
-                                Text("Отладочная тест-кнопка", style = MaterialTheme.typography.titleMedium, color = Color.White)
+                                Text("Отладочная тест-кнопка", style = MaterialTheme.typography.titleMedium, color = textColor)
                                 Spacer(Modifier.height(12.dp))
                                 UniversalActionListContent(
                                     keyMap = keyMap,
@@ -298,7 +313,7 @@ fun SettingsScreen(keyMap: KeyMap, onBack: () -> Unit) {
                                 )
                                 Spacer(Modifier.height(8.dp))
                                 TextButton(onClick = { showTestDialog = false }, modifier = Modifier.align(Alignment.End)) {
-                                    Text("Готово", color = Color.White)
+                                    Text("Готово", color = textColor)
                                 }
                             }
                         }
@@ -317,7 +332,7 @@ fun SettingsScreen(keyMap: KeyMap, onBack: () -> Unit) {
                 val x = if (isRight) size.width - barWidth else 0f
 
                 drawRoundRect(
-                    color = Color.White,
+                    color = textColor,
                     topLeft = Offset(x, y - barHeight / 2),
                     size = androidx.compose.ui.geometry.Size(barWidth, barHeight),
                     cornerRadius = androidx.compose.ui.geometry.CornerRadius(4f, 4f)

@@ -1,5 +1,4 @@
 package com.HojuNK.essent_all.ui.components
-
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -7,12 +6,16 @@ import android.graphics.Typeface
 import android.text.Html
 import android.text.SpannableStringBuilder
 import android.text.Spanned
+import android.text.style.AbsoluteSizeSpan
 import android.text.style.ForegroundColorSpan
 import android.text.style.StyleSpan
+import android.text.style.TypefaceSpan
 import android.text.style.UnderlineSpan
 import android.util.Log
 import android.view.WindowManager
 import android.widget.Toast
+import org.json.JSONArray
+import org.json.JSONObject
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.compose.animation.*
@@ -25,12 +28,14 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import com.HojuNK.essent_all.ui.editor.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -47,16 +52,20 @@ import androidx.compose.material.icons.filled.CleaningServices
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FormatBold
 import androidx.compose.material.icons.filled.FormatClear
 import androidx.compose.material.icons.filled.FormatColorText
 import androidx.compose.material.icons.filled.FormatItalic
+import androidx.compose.material.icons.filled.FormatSize
 import androidx.compose.material.icons.filled.FormatUnderlined
 import androidx.compose.material.icons.filled.OpenWith
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Sync
+import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material3.*
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
@@ -67,20 +76,32 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.platform.WindowInfo
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.TextFieldValue
@@ -89,6 +110,7 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.graphics.drawable.toBitmap
@@ -101,6 +123,14 @@ import java.util.Date
 import java.util.Locale
 import kotlin.math.abs
 
+val NdotFontFamily = try {
+    val field = R.font::class.java.getField("ndot55")
+    val resId = field.getInt(null)
+    FontFamily(Font(resId))
+} catch (e: Exception) {
+    FontFamily.Monospace
+}
+
 enum class ClipboardOverlayState {
     MINIMAL,   // ~100.dp (only handle bar + bottom buttons)
     COLLAPSED, // ~320.dp (standard keyboard size)
@@ -108,7 +138,63 @@ enum class ClipboardOverlayState {
 }
 
 enum class FormatType {
-    BOLD, ITALIC, UNDERLINE, COLOR, CLEAR
+    BOLD, ITALIC, UNDERLINE, COLOR, SIZE, FONT, CLEAR
+}
+
+enum class NoteFilter(val title: String) {
+    ALL("Все"),
+    CLIPBOARD("Буфер"),
+    NOTES("Заметки"),
+    FAVORITES("Избранное"),
+    LINKS("Ссылки"),
+    FORMATTED("С форматированием"),
+    PLAIN_TEXT("Чистый текст"),
+    SHORT("Короткие"),
+    LONG("Длинные")
+}
+
+fun hasLink(text: String): Boolean {
+    val urlRegex = Regex("""(https?://|www\.)\S+""", RegexOption.IGNORE_CASE)
+    return urlRegex.containsMatchIn(text)
+}
+
+fun hasFormatting(text: String): Boolean {
+    val formatRegex = Regex("""<[^>]+>|•|☐|☑|\[\s*\]|\[x\]|^\d+\.\s""", RegexOption.MULTILINE)
+    return formatRegex.containsMatchIn(text)
+}
+
+fun stripHtmlAndStructures(text: String): String {
+    if (text.trim().startsWith("{") && text.trim().endsWith("}")) {
+        try {
+            val rootObj = org.json.JSONObject(text)
+            val blocksArr = rootObj.optJSONArray("blocks")
+            if (blocksArr != null) {
+                val sb = StringBuilder()
+                for (i in 0 until blocksArr.length()) {
+                    val blockObj = blocksArr.getJSONObject(i)
+                    val type = blockObj.optString("type", "text")
+                    if (type == "text") {
+                        val jsonStr = blockObj.optString("content", "")
+                        val plainText = try {
+                            val obj = org.json.JSONObject(jsonStr)
+                            obj.optString("text", "")
+                        } catch (e: Exception) {
+                            jsonStr.replace(Regex("""<[^>]+>"""), "")
+                        }
+                        if (plainText.isNotBlank()) {
+                            if (sb.isNotEmpty()) sb.append("\n")
+                            sb.append(plainText)
+                        }
+                    } else if (type == "image") {
+                        if (sb.isNotEmpty()) sb.append("\n")
+                        sb.append("[Изображение]")
+                    }
+                }
+                return sb.toString()
+            }
+        } catch (e: Exception) {}
+    }
+    return text.replace(Regex("""<[^>]+>"""), "")
 }
 
 data class ColorPaletteItem(
@@ -132,6 +218,44 @@ val defaultColorPalette = listOf(
 
 fun htmlToAnnotatedString(html: String): AnnotatedString {
     if (html.isBlank()) return AnnotatedString("")
+    if (html.trim().startsWith("{") && html.trim().endsWith("}")) {
+        return try {
+            val rootObj = JSONObject(html)
+            val blocksArr = rootObj.optJSONArray("blocks")
+            if (blocksArr != null) {
+                val sb = StringBuilder()
+                val spans = mutableListOf<AnnotatedString.Range<SpanStyle>>()
+                for (i in 0 until blocksArr.length()) {
+                    val blockObj = blocksArr.getJSONObject(i)
+                    val type = blockObj.optString("type", "text")
+                    if (type == "text") {
+                        val jsonStr = blockObj.optString("content", "")
+                        val annotated = jsonToAnnotatedStringInternal(jsonStr)
+                        val startOffset = sb.length
+                        sb.append(annotated.text)
+                        for (span in annotated.spanStyles) {
+                            spans.add(AnnotatedString.Range(span.item, span.start + startOffset, span.end + startOffset))
+                        }
+                        if (i < blocksArr.length() - 1) {
+                            sb.append("\n")
+                        }
+                    } else if (type == "image") {
+                        val startOffset = sb.length
+                        sb.append("[Изображение]")
+                        spans.add(AnnotatedString.Range(SpanStyle(color = Color.Gray, fontStyle = FontStyle.Italic), startOffset, sb.length))
+                        if (i < blocksArr.length() - 1) {
+                            sb.append("\n")
+                        }
+                    }
+                }
+                AnnotatedString(text = sb.toString(), spanStyles = spans)
+            } else {
+                jsonToAnnotatedStringInternal(html)
+            }
+        } catch (e: Exception) {
+            jsonToAnnotatedStringInternal(html)
+        }
+    }
     return try {
         val spanned = if (html.contains("<") && html.contains(">")) {
             Html.fromHtml(html, Html.FROM_HTML_MODE_LEGACY)
@@ -154,6 +278,12 @@ fun htmlToAnnotatedString(html: String): AnnotatedString {
                             }
                             is UnderlineSpan -> addStyle(SpanStyle(textDecoration = TextDecoration.Underline), start, end)
                             is ForegroundColorSpan -> addStyle(SpanStyle(color = Color(span.foregroundColor)), start, end)
+                            is AbsoluteSizeSpan -> addStyle(SpanStyle(fontSize = span.size.sp), start, end)
+                            is TypefaceSpan -> {
+                                if (span.family == "monospace" || span.family == "ndot55") {
+                                    addStyle(SpanStyle(fontFamily = NdotFontFamily), start, end)
+                                }
+                            }
                         }
                     }
                 }
@@ -163,6 +293,77 @@ fun htmlToAnnotatedString(html: String): AnnotatedString {
         }
     } catch (e: Exception) {
         AnnotatedString(html)
+    }
+}
+
+private fun jsonToAnnotatedStringInternal(jsonStr: String): AnnotatedString {
+    if (jsonStr.isBlank()) return AnnotatedString("")
+    return try {
+        val trimmed = jsonStr.trim()
+        if (trimmed.startsWith("{") && trimmed.endsWith("}")) {
+            val obj = JSONObject(trimmed)
+            val text = obj.optString("text", "")
+            val spansArr = obj.optJSONArray("spans") ?: JSONArray()
+            val spans = mutableListOf<AnnotatedString.Range<SpanStyle>>()
+
+            for (i in 0 until spansArr.length()) {
+                val spanObj = spansArr.getJSONObject(i)
+                val start = spanObj.optInt("start", 0).coerceIn(0, text.length)
+                val end = spanObj.optInt("end", 0).coerceIn(0, text.length)
+
+                val isBold = spanObj.optBoolean("bold", false)
+                val isItalic = spanObj.optBoolean("italic", false)
+                val isUnderline = spanObj.optBoolean("underline", false)
+                val fontSizeVal = spanObj.optDouble("fontSize", -1.0)
+                val fontFamilyStr = spanObj.optString("fontFamily", "")
+
+                if (start < end) {
+                    var spanStyle = SpanStyle()
+                    if (isBold) spanStyle = spanStyle.copy(fontWeight = FontWeight.Bold)
+                    if (isItalic) spanStyle = spanStyle.copy(fontStyle = FontStyle.Italic)
+                    if (isUnderline) spanStyle = spanStyle.copy(textDecoration = TextDecoration.Underline)
+
+                    val colorObj = spanObj.opt("color")
+                    if (colorObj != null) {
+                        try {
+                            val colorVal = when (colorObj) {
+                                is Number -> Color(colorObj.toLong().toULong())
+                                is String -> {
+                                    if (colorObj.startsWith("#")) Color(android.graphics.Color.parseColor(colorObj))
+                                    else colorObj.toLongOrNull()?.let { Color(it.toULong()) } ?: Color.Unspecified
+                                }
+                                else -> Color.Unspecified
+                            }
+                            if (colorVal != Color.Unspecified) {
+                                spanStyle = spanStyle.copy(color = colorVal)
+                            }
+                        } catch (e: Exception) {}
+                    }
+
+                    if (fontSizeVal > 0) {
+                        spanStyle = spanStyle.copy(fontSize = fontSizeVal.toFloat().sp)
+                    }
+                    if (fontFamilyStr.isNotEmpty()) {
+                        val fontFamily = FontManager.getFontFamilyById(fontFamilyStr)
+                        if (fontFamily != null) {
+                            spanStyle = spanStyle.copy(fontFamily = fontFamily)
+                        }
+                    }
+
+                    spans.add(AnnotatedString.Range(spanStyle, start, end))
+                }
+            }
+            AnnotatedString(text = text, spanStyles = spans)
+        } else {
+            AnnotatedString(jsonStr)
+        }
+    } catch (e: Exception) {
+        try {
+            val obj = JSONObject(jsonStr)
+            AnnotatedString(obj.optString("text", jsonStr))
+        } catch (e2: Exception) {
+            AnnotatedString(jsonStr.replace(Regex("""<[^>]+>"""), ""))
+        }
     }
 }
 
@@ -195,6 +396,14 @@ fun annotatedStringToHtml(annotatedString: AnnotatedString): String {
                 val colorInt = style.color.toArgb()
                 ssb.setSpan(ForegroundColorSpan(colorInt), start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
             }
+
+            if (style.fontSize != TextUnit.Unspecified) {
+                ssb.setSpan(AbsoluteSizeSpan(style.fontSize.value.toInt(), true), start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            }
+
+            if (style.fontFamily == NdotFontFamily) {
+                ssb.setSpan(TypefaceSpan("monospace"), start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            }
         }
         val rawHtml = Html.toHtml(ssb)
         cleanHtml(rawHtml)
@@ -211,6 +420,396 @@ private fun cleanHtml(html: String): String {
         result = result.substring("<p>".length, result.length - "</p>".length).trim()
     }
     return result
+}
+
+@Composable
+fun BlinkingCaretAtRect(rect: Rect) {
+    val infiniteTransition = rememberInfiniteTransition(label = "caret_blink")
+    val alpha by infiniteTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = 0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 500, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "caret_alpha"
+    )
+    val caretHeightDp = with(LocalDensity.current) { rect.height.toDp() }.coerceAtLeast(18.dp)
+
+    Box(
+        modifier = Modifier
+            .offset { IntOffset(rect.left.toInt(), rect.top.toInt()) }
+            .width(2.5.dp)
+            .height(caretHeightDp)
+            .graphicsLayer { this.alpha = alpha }
+            .background(Color.White)
+    )
+}
+
+@Composable
+fun OverlayCustomTextField(
+    value: TextFieldValue,
+    onValueChange: (TextFieldValue) -> Unit,
+    focusRequester: FocusRequester,
+    placeholder: String = "Введите текст записи..."
+) {
+    var textLayoutResult by remember { mutableStateOf<TextLayoutResult?>(null) }
+    var isFocused by remember { mutableStateOf(false) }
+
+    val cursorRect = remember(textLayoutResult, value.selection, value.text) {
+        val layout = textLayoutResult
+        if (layout != null) {
+            val index = value.selection.start.coerceIn(0, layout.layoutInput.text.length)
+            layout.getCursorRect(index)
+        } else null
+    }
+
+    val useDark = com.HojuNK.essent_all.LocalUseDark.current
+    val bgCol = if (useDark) Color(0xFF252525) else Color(0xFF1E1E1E)
+
+    CompositionLocalProvider(
+        LocalWindowInfo provides remember {
+            object : WindowInfo {
+                override val isWindowFocused: Boolean get() = true
+            }
+        }
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 120.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(bgCol)
+                .border(1.dp, Color(0xFF333333), RoundedCornerShape(12.dp))
+                .padding(16.dp)
+        ) {
+            BasicTextField(
+                value = value,
+                onValueChange = onValueChange,
+                onTextLayout = { textLayoutResult = it },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 100.dp)
+                    .focusRequester(focusRequester)
+                    .onFocusChanged { isFocused = it.isFocused },
+                textStyle = TextStyle(
+                    color = Color.White,
+                    fontSize = 15.sp,
+                    lineHeight = 22.sp
+                ),
+                cursorBrush = SolidColor(Color.Transparent),
+                decorationBox = { innerTextField ->
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 100.dp),
+                        contentAlignment = Alignment.TopStart
+                    ) {
+                        if (value.text.isEmpty()) {
+                            Text(text = placeholder, color = Color.Gray, fontSize = 15.sp)
+                        }
+                        innerTextField()
+                        
+                        if (isFocused) {
+                            cursorRect?.let { rect ->
+                                BlinkingCaretAtRect(rect)
+                            }
+                        }
+                    }
+                }
+            )
+        }
+    }
+}
+
+sealed interface NoteBlockItem {
+    data class TextBlock(val textFieldValue: TextFieldValue = TextFieldValue()) : NoteBlockItem
+    data class ImageBlock(val path: String, val isThumbnail: Boolean = false) : NoteBlockItem
+}
+
+sealed interface OverlayRenderGroup {
+    data class Single(val index: Int, val block: NoteBlockItem) : OverlayRenderGroup
+    data class ThumbnailRow(val items: List<Pair<Int, NoteBlockItem.ImageBlock>>) : OverlayRenderGroup
+}
+
+fun groupBlocksForOverlay(blocks: List<NoteBlockItem>): List<OverlayRenderGroup> {
+    val result = mutableListOf<OverlayRenderGroup>()
+    var currentThumbnails = mutableListOf<Pair<Int, NoteBlockItem.ImageBlock>>()
+
+    for (i in blocks.indices) {
+        val block = blocks[i]
+        if (block is NoteBlockItem.ImageBlock && block.isThumbnail) {
+            currentThumbnails.add(i to block)
+            if (currentThumbnails.size == 4) {
+                result.add(OverlayRenderGroup.ThumbnailRow(currentThumbnails.toList()))
+                currentThumbnails = mutableListOf()
+            }
+        } else {
+            if (currentThumbnails.isNotEmpty()) {
+                result.add(OverlayRenderGroup.ThumbnailRow(currentThumbnails.toList()))
+                currentThumbnails = mutableListOf()
+            }
+            result.add(OverlayRenderGroup.Single(i, block))
+        }
+    }
+    if (currentThumbnails.isNotEmpty()) {
+        result.add(OverlayRenderGroup.ThumbnailRow(currentThumbnails.toList()))
+    }
+    return result
+}
+
+fun parseNoteContentToBlocks(content: String): List<NoteBlockItem> {
+    val blocks = mutableListOf<NoteBlockItem>()
+    if (content.trim().startsWith("{") && content.trim().endsWith("}")) {
+        try {
+            val rootObj = JSONObject(content)
+            val blocksArr = rootObj.optJSONArray("blocks")
+            if (blocksArr != null) {
+                for (i in 0 until blocksArr.length()) {
+                    val blockObj = blocksArr.getJSONObject(i)
+                    val type = blockObj.optString("type", "text")
+                    if (type == "image") {
+                        val path = blockObj.optString("path", "")
+                        val isThumb = blockObj.optBoolean("thumb", false)
+                        if (path.isNotEmpty()) {
+                            blocks.add(NoteBlockItem.ImageBlock(path = path, isThumbnail = isThumb))
+                        }
+                    } else {
+                        val jsonStr = blockObj.optString("content", "")
+                        val annotated = jsonToAnnotatedStringInternal(jsonStr)
+                        blocks.add(NoteBlockItem.TextBlock(textFieldValue = TextFieldValue(annotatedString = annotated)))
+                    }
+                }
+            }
+        } catch (e: Exception) {}
+    }
+
+    if (blocks.isEmpty()) {
+        val regex = Regex("""<img src="file://([^"]+)"(?:\s+data-thumb="(true|false)")?\s*/?>""")
+        var lastIndex = 0
+        regex.findAll(content).forEach { matchResult ->
+            val textBefore = content.substring(lastIndex, matchResult.range.first)
+            if (textBefore.isNotBlank()) {
+                blocks.add(
+                    NoteBlockItem.TextBlock(
+                        textFieldValue = TextFieldValue(annotatedString = htmlToAnnotatedString(textBefore))
+                    )
+                )
+            }
+            val imgPath = matchResult.groupValues[1]
+            val isThumb = matchResult.groupValues.getOrNull(2) == "true"
+            if (imgPath.isNotEmpty()) {
+                blocks.add(NoteBlockItem.ImageBlock(path = imgPath, isThumbnail = isThumb))
+            }
+            lastIndex = matchResult.range.last + 1
+        }
+        if (lastIndex < content.length) {
+            val remainingText = content.substring(lastIndex)
+            if (remainingText.isNotBlank()) {
+                blocks.add(
+                    NoteBlockItem.TextBlock(
+                        textFieldValue = TextFieldValue(annotatedString = htmlToAnnotatedString(remainingText))
+                    )
+                )
+            }
+        }
+        if (blocks.isEmpty()) {
+            blocks.add(NoteBlockItem.TextBlock(textFieldValue = TextFieldValue(annotatedString = htmlToAnnotatedString(content))))
+        }
+    }
+    return blocks
+}
+
+fun buildContentFromBlocks(blocks: List<NoteBlockItem>): String {
+    val rootObj = JSONObject()
+    val blocksArr = JSONArray()
+    blocks.forEach { block ->
+        val blockObj = JSONObject()
+        when (block) {
+            is NoteBlockItem.TextBlock -> {
+                blockObj.put("type", "text")
+                blockObj.put("content", annotatedStringToJson(block.textFieldValue.annotatedString))
+            }
+            is NoteBlockItem.ImageBlock -> {
+                blockObj.put("type", "image")
+                blockObj.put("path", block.path)
+                blockObj.put("thumb", block.isThumbnail)
+            }
+        }
+        blocksArr.put(blockObj)
+    }
+    rootObj.put("blocks", blocksArr)
+    return rootObj.toString()
+}
+
+fun annotatedStringToJson(annotated: AnnotatedString): String {
+    val obj = JSONObject()
+    obj.put("text", annotated.text)
+    val spansArr = JSONArray()
+    annotated.spanStyles.forEach { span ->
+        val spanObj = JSONObject()
+        spanObj.put("start", span.start)
+        spanObj.put("end", span.end)
+        spanObj.put("color", span.item.color.value.toLong())
+        if (span.item.fontSize != TextUnit.Unspecified) {
+            spanObj.put("fontSize", span.item.fontSize.value.toDouble())
+        }
+        spanObj.put("bold", span.item.fontWeight == FontWeight.Bold)
+        spanObj.put("italic", span.item.fontStyle == FontStyle.Italic)
+        spanObj.put("underline", span.item.textDecoration?.contains(TextDecoration.Underline) == true)
+        val fontId = FontManager.getFontIdByFamily(span.item.fontFamily)
+        if (fontId.isNotEmpty()) {
+            spanObj.put("fontFamily", fontId)
+        }
+        spansArr.put(spanObj)
+    }
+    obj.put("spans", spansArr)
+    return obj.toString()
+}
+
+@Composable
+fun OverlayBlocksRenderer(
+    itemId: String = "",
+    content: String = "",
+    blocksList: List<NoteBlockItem>? = null,
+    modifier: Modifier = Modifier.fillMaxSize(),
+    isEditing: Boolean = false,
+    onBlocksChanged: (List<NoteBlockItem>) -> Unit = {},
+    focusRequester: FocusRequester? = null,
+    onTapTextToEdit: () -> Unit = {}
+) {
+    val blocks = blocksList ?: parseNoteContentToBlocks(content)
+    val renderGroups = groupBlocksForOverlay(blocks)
+    val useDark = com.HojuNK.essent_all.LocalUseDark.current
+    val textColor = if (useDark) Color.White else Color.Black
+
+    LazyColumn(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        items(renderGroups.size) { gIdx ->
+            when (val group = renderGroups[gIdx]) {
+                is OverlayRenderGroup.Single -> {
+                    val idx = group.index
+                    val block = group.block
+                    when (block) {
+                        is NoteBlockItem.TextBlock -> {
+                            if (isEditing) {
+                                OverlayCustomTextField(
+                                    value = block.textFieldValue,
+                                    onValueChange = { newTfv ->
+                                        val updatedTfv = preserveSpansOnTextChange(block.textFieldValue.annotatedString, newTfv)
+                                        val mutable = blocks.toMutableList()
+                                        mutable[idx] = block.copy(textFieldValue = updatedTfv)
+                                        onBlocksChanged(mutable)
+                                    },
+                                    focusRequester = if (idx == 0 && focusRequester != null) focusRequester else remember { FocusRequester() },
+                                    placeholder = "Введите текст записи..."
+                                )
+                            } else {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(if (useDark) Color(0xFF252525) else Color(0xFF1E1E1E))
+                                        .border(1.dp, Color(0xFF333333), RoundedCornerShape(12.dp))
+                                        .pointerInput(Unit) {
+                                            detectTapGestures(onTap = { onTapTextToEdit() })
+                                        }
+                                        .padding(14.dp)
+                                ) {
+                                    SelectionContainer {
+                                        Text(
+                                            text = block.textFieldValue.annotatedString,
+                                            color = textColor,
+                                            fontSize = 15.sp,
+                                            lineHeight = 22.sp
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                        is NoteBlockItem.ImageBlock -> {
+                            val bitmap = remember(block.path) {
+                                try {
+                                    android.graphics.BitmapFactory.decodeFile(block.path)
+                                } catch (e: Exception) {
+                                    null
+                                }
+                            }
+                            if (bitmap != null) {
+                                val aspectRatio = if (bitmap.height > 0) bitmap.width.toFloat() / bitmap.height.toFloat() else 1f
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(Color(0xFF1A1A1A))
+                                        .padding(4.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Image(
+                                        bitmap = bitmap.asImageBitmap(),
+                                        contentDescription = "Full Size Image",
+                                        contentScale = ContentScale.Fit,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .aspectRatio(aspectRatio.coerceIn(0.2f, 5.0f))
+                                            .clip(RoundedCornerShape(8.dp))
+                                    )
+                                }
+                            } else {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(Color(0xFF1A1A1A))
+                                        .padding(8.dp)
+                                ) {
+                                    Text(
+                                        text = "Фото: ${block.path}",
+                                        color = Color.Gray,
+                                        fontSize = 13.sp,
+                                        modifier = Modifier.padding(8.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+                is OverlayRenderGroup.ThumbnailRow -> {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        group.items.forEach { (_, block) ->
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .aspectRatio(1f)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(Color(0xFF1A1A1A))
+                            ) {
+                                val bitmap = remember(block.path) {
+                                    try { android.graphics.BitmapFactory.decodeFile(block.path) } catch (e: Exception) { null }
+                                }
+                                if (bitmap != null) {
+                                    Image(
+                                        bitmap = bitmap.asImageBitmap(),
+                                        contentDescription = "Thumbnail",
+                                        contentScale = ContentScale.Crop,
+                                        modifier = Modifier.fillMaxSize()
+                                    )
+                                }
+                            }
+                        }
+                        repeat(4 - group.items.size) {
+                            Spacer(modifier = Modifier.weight(1f))
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 fun preserveSpansOnTextChange(
@@ -290,86 +889,109 @@ fun applyStyleToAnnotatedString(
     selectionStart: Int,
     selectionEnd: Int,
     formatType: FormatType,
-    colorValue: Color = Color.Unspecified
+    colorValue: Color = Color.Unspecified,
+    sizeOffset: Int = 0,
+    fontFamilyValue: FontFamily? = null
 ): AnnotatedString {
     val text = current.text
     if (text.isEmpty()) return current
 
-    val targetStart = if (selectionStart < selectionEnd) selectionStart.coerceIn(0, text.length) else 0
-    val targetEnd = if (selectionStart < selectionEnd) selectionEnd.coerceIn(0, text.length) else text.length
+    val startRaw = minOf(selectionStart, selectionEnd).coerceIn(0, text.length)
+    val endRaw = maxOf(selectionStart, selectionEnd).coerceIn(0, text.length)
+    val start = if (startRaw == endRaw) 0 else startRaw
+    val end = if (startRaw == endRaw) text.length else endRaw
 
-    if (targetStart >= targetEnd) return current
+    if (start >= end) return current
+
+    if (formatType == FormatType.FONT) {
+        return applyFontToAnnotatedString(current, selectionStart, selectionEnd, fontFamilyValue)
+    }
 
     val existingSpans = current.spanStyles.toMutableList()
 
     if (formatType == FormatType.CLEAR) {
         val newSpans = mutableListOf<AnnotatedString.Range<SpanStyle>>()
         for (range in existingSpans) {
-            if (range.end <= targetStart || range.start >= targetEnd) {
+            if (range.end <= start || range.start >= end) {
                 newSpans.add(range)
             } else {
-                if (range.start < targetStart) {
-                    newSpans.add(AnnotatedString.Range(range.item, range.start, targetStart))
+                if (range.start < start) {
+                    newSpans.add(AnnotatedString.Range(range.item, range.start, start))
                 }
-                if (range.end > targetEnd) {
-                    newSpans.add(AnnotatedString.Range(range.item, targetEnd, range.end))
+                if (range.end > end) {
+                    newSpans.add(AnnotatedString.Range(range.item, end, range.end))
                 }
             }
         }
         return AnnotatedString(text = text, spanStyles = newSpans)
     }
 
-    val spansInRange = existingSpans.filter { it.start <= targetStart && it.end >= targetEnd }
+    val overlappingSpans = existingSpans.filter { it.start < end && it.end > start }
     val isAlreadyApplied = when (formatType) {
-        FormatType.BOLD -> spansInRange.any { it.item.fontWeight == FontWeight.Bold }
-        FormatType.ITALIC -> spansInRange.any { it.item.fontStyle == FontStyle.Italic }
-        FormatType.UNDERLINE -> spansInRange.any { it.item.textDecoration?.contains(TextDecoration.Underline) == true }
-        FormatType.COLOR -> spansInRange.any { it.item.color == colorValue }
-        else -> false
+        FormatType.BOLD -> overlappingSpans.any { it.item.fontWeight == FontWeight.Bold }
+        FormatType.ITALIC -> overlappingSpans.any { it.item.fontStyle == FontStyle.Italic }
+        FormatType.UNDERLINE -> overlappingSpans.any { it.item.textDecoration?.contains(TextDecoration.Underline) == true }
+        FormatType.COLOR -> overlappingSpans.any { it.item.color == colorValue }
+        FormatType.SIZE -> overlappingSpans.any { it.item.fontSize == (16 + sizeOffset).sp }
+        FormatType.FONT -> overlappingSpans.any { it.item.fontFamily == fontFamilyValue }
+        FormatType.CLEAR -> false
     }
 
     val newSpans = mutableListOf<AnnotatedString.Range<SpanStyle>>()
 
     for (range in existingSpans) {
-        val overlaps = (range.start < targetEnd && range.end > targetStart)
-        if (!overlaps) {
-            newSpans.add(range)
-            continue
-        }
-
+        val rStart = range.start
+        val rEnd = range.end
         val style = range.item
-        val shouldRemoveThisAttribute = isAlreadyApplied || (formatType == FormatType.COLOR)
 
-        val modifiedStyle = when (formatType) {
-            FormatType.BOLD -> if (shouldRemoveThisAttribute) style.copy(fontWeight = null) else style
-            FormatType.ITALIC -> if (shouldRemoveThisAttribute) style.copy(fontStyle = null) else style
-            FormatType.UNDERLINE -> if (shouldRemoveThisAttribute) style.copy(textDecoration = null) else style
-            FormatType.COLOR -> style.copy(color = Color.Unspecified)
-            FormatType.CLEAR -> SpanStyle()
-        }
+        val noOverlap = rEnd <= start || rStart >= end
+        if (noOverlap) {
+            newSpans.add(range)
+        } else {
+            if (rStart < start) {
+                newSpans.add(AnnotatedString.Range(style, rStart, start))
+            }
+            if (rEnd > end) {
+                newSpans.add(AnnotatedString.Range(style, end, rEnd))
+            }
 
-        if (range.start < targetStart) {
-            newSpans.add(AnnotatedString.Range(style, range.start, targetStart))
-        }
-        if (range.end > targetEnd) {
-            newSpans.add(AnnotatedString.Range(style, targetEnd, range.end))
-        }
+            val overlapStart = maxOf(rStart, start)
+            val overlapEnd = minOf(rEnd, end)
 
-        if (hasAnyAttribute(modifiedStyle)) {
-            newSpans.add(AnnotatedString.Range(modifiedStyle, maxOf(range.start, targetStart), minOf(range.end, targetEnd)))
+            val modifiedStyle = when (formatType) {
+                FormatType.BOLD -> if (isAlreadyApplied) style.copy(fontWeight = null) else style.copy(fontWeight = FontWeight.Bold)
+                FormatType.ITALIC -> if (isAlreadyApplied) style.copy(fontStyle = null) else style.copy(fontStyle = FontStyle.Italic)
+                FormatType.UNDERLINE -> if (isAlreadyApplied) style.copy(textDecoration = null) else style.copy(textDecoration = TextDecoration.Underline)
+                FormatType.COLOR -> style.copy(color = colorValue)
+                FormatType.SIZE -> style.copy(fontSize = (16 + sizeOffset).sp)
+                FormatType.FONT -> style.copy(fontFamily = fontFamilyValue)
+                FormatType.CLEAR -> SpanStyle()
+            }
+
+            if (hasAnyAttribute(modifiedStyle)) {
+                newSpans.add(AnnotatedString.Range(modifiedStyle, overlapStart, overlapEnd))
+            }
         }
     }
 
     if (!isAlreadyApplied && formatType != FormatType.CLEAR) {
+        var baseStyle = SpanStyle()
+        for (range in overlappingSpans) {
+            baseStyle = range.item
+            break
+        }
         val newStyle = when (formatType) {
-            FormatType.BOLD -> SpanStyle(fontWeight = FontWeight.Bold)
-            FormatType.ITALIC -> SpanStyle(fontStyle = FontStyle.Italic)
-            FormatType.UNDERLINE -> SpanStyle(textDecoration = TextDecoration.Underline)
-            FormatType.COLOR -> if (colorValue != Color.Unspecified) SpanStyle(color = colorValue) else null
+            FormatType.BOLD -> baseStyle.copy(fontWeight = FontWeight.Bold)
+            FormatType.ITALIC -> baseStyle.copy(fontStyle = FontStyle.Italic)
+            FormatType.UNDERLINE -> baseStyle.copy(textDecoration = TextDecoration.Underline)
+            FormatType.COLOR -> if (colorValue != Color.Unspecified) baseStyle.copy(color = colorValue) else baseStyle
+            FormatType.SIZE -> baseStyle.copy(fontSize = (16 + sizeOffset).sp)
+            FormatType.FONT -> baseStyle.copy(fontFamily = fontFamilyValue)
             FormatType.CLEAR -> null
         }
-        if (newStyle != null) {
-            newSpans.add(AnnotatedString.Range(newStyle, targetStart, targetEnd))
+        if (newStyle != null && hasAnyAttribute(newStyle)) {
+            newSpans.removeIf { it.start >= start && it.end <= end }
+            newSpans.add(AnnotatedString.Range(newStyle, start, end))
         }
     }
 
@@ -377,7 +999,8 @@ fun applyStyleToAnnotatedString(
 }
 
 private fun hasAnyAttribute(style: SpanStyle): Boolean {
-    return style.fontWeight != null || style.fontStyle != null || style.textDecoration != null || (style.color != Color.Unspecified)
+    return style.fontWeight != null || style.fontStyle != null || style.textDecoration != null ||
+            (style.color != Color.Unspecified) || (style.fontSize != TextUnit.Unspecified) || (style.fontFamily != null)
 }
 
 private fun mergeAdjacentSpans(spans: List<AnnotatedString.Range<SpanStyle>>): List<AnnotatedString.Range<SpanStyle>> {
@@ -419,10 +1042,11 @@ private fun formatHeaderDate(timestamp: Long): String {
 private fun itemTimestamp(item: ClipboardItem): Long = item.timestamp
 
 @Composable
-private fun ColorPaletteBar(
+internal fun ColorPaletteBar(
     palette: List<ColorPaletteItem>,
     activeColor: Color,
-    onSelectColor: (ColorPaletteItem) -> Unit
+    onSelectColor: (ColorPaletteItem) -> Unit,
+    onOpenAdvancedPalette: (() -> Unit)? = null
 ) {
     Surface(
         modifier = Modifier
@@ -432,30 +1056,56 @@ private fun ColorPaletteBar(
         color = Color(0xFF252525),
         border = BorderStroke(1.dp, Color(0xFF3B3B3B))
     ) {
-        LazyRow(
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 8.dp, vertical = 6.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            items(palette) { item ->
+            LazyRow(
+                modifier = Modifier
+                    .weight(1f),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                items(palette) { item ->
+                    Surface(
+                        onClick = { onSelectColor(item) },
+                        shape = CircleShape,
+                        color = if (item.isClear) Color(0xFF333333) else item.color,
+                        border = if (item.color == activeColor && !item.isClear) BorderStroke(2.dp, Color.White) else BorderStroke(1.dp, Color(0xFF555555)),
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            if (item.isClear) {
+                                Icon(
+                                    imageVector = Icons.Filled.FormatClear,
+                                    contentDescription = "Original",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+            if (onOpenAdvancedPalette != null) {
+                Spacer(modifier = Modifier.width(8.dp))
                 Surface(
-                    onClick = { onSelectColor(item) },
+                    onClick = onOpenAdvancedPalette,
                     shape = CircleShape,
-                    color = if (item.isClear) Color(0xFF333333) else item.color,
-                    border = if (item.color == activeColor && !item.isClear) BorderStroke(2.dp, Color.White) else BorderStroke(1.dp, Color(0xFF555555)),
+                    color = Color(0xFF333333),
+                    border = BorderStroke(1.dp, Color(0xFF555555)),
                     modifier = Modifier.size(32.dp)
                 ) {
                     Box(contentAlignment = Alignment.Center) {
-                        if (item.isClear) {
-                            Icon(
-                                imageVector = Icons.Filled.FormatClear,
-                                contentDescription = "Original",
-                                tint = Color.White,
-                                modifier = Modifier.size(16.dp)
-                            )
-                        }
+                        Icon(
+                            imageVector = Icons.Filled.FormatColorText,
+                            contentDescription = "Advanced Palette",
+                            tint = Color.White,
+                            modifier = Modifier.size(16.dp)
+                        )
                     }
                 }
             }
@@ -468,6 +1118,8 @@ private fun ColorPaletteBar(
 fun ClipboardOverlayContent(
     isScreenLocked: Boolean = false,
     activePackageName: String? = null,
+    initialState: ClipboardOverlayState = ClipboardOverlayState.COLLAPSED,
+    isFullScreen: Boolean = false,
     onDismiss: () -> Unit,
     onPasteItem: (String) -> Unit,
     onPinChanged: (Boolean) -> Unit = {},
@@ -519,60 +1171,89 @@ fun ClipboardOverlayContent(
 
     var activeColor by remember { mutableStateOf<Color>(Color(0xFFFF3B30)) }
     var showColorPalette by remember { mutableStateOf(false) }
-    var editingTextFieldValue by remember { mutableStateOf(TextFieldValue()) }
+    var showSizeMenu by remember { mutableStateOf(false) }
+    var showFontMenu by remember { mutableStateOf(false) }
+    var showSettingsMenu by remember { mutableStateOf(false) }
+    var currentSizeOffset by remember { mutableIntStateOf(0) }
+    var activeFontName by remember { mutableStateOf("system") }
+    var undoStack by remember { mutableStateOf(listOf<List<NoteBlockItem>>()) }
+    var redoStack by remember { mutableStateOf(listOf<List<NoteBlockItem>>()) }
 
-    var undoStack by remember { mutableStateOf(listOf<TextFieldValue>()) }
-    var redoStack by remember { mutableStateOf(listOf<TextFieldValue>()) }
-    var lastEditTimestamp by remember { mutableLongStateOf(0L) }
+    var currentBlocks by remember { mutableStateOf<List<NoteBlockItem>>(emptyList()) }
+
+    LaunchedEffect(isEditingDetail, isCreatingNewItem, selectedDetailItem) {
+        showColorPalette = false
+        showSizeMenu = false
+        showFontMenu = false
+        if (isEditingDetail && selectedDetailItem != null) {
+            currentBlocks = parseNoteContentToBlocks(selectedDetailItem!!.content)
+        } else if (isCreatingNewItem) {
+            currentBlocks = listOf(NoteBlockItem.TextBlock())
+        }
+    }
 
     fun pushUndoState() {
-        if (undoStack.lastOrNull() != editingTextFieldValue) {
-            undoStack = (undoStack + editingTextFieldValue).takeLast(30)
+        if (undoStack.lastOrNull() != currentBlocks) {
+            undoStack = (undoStack + listOf(currentBlocks)).takeLast(30)
             redoStack = emptyList()
+        }
+    }
+
+    fun handleFormatAction(
+        formatType: FormatType,
+        colorValue: Color = Color.Unspecified,
+        sizeOffset: Int = 0,
+        fontFamilyValue: FontFamily? = null
+    ) {
+        pushUndoState()
+        if (isEditingDetail || isCreatingNewItem) {
+            if (currentBlocks.isEmpty()) {
+                currentBlocks = listOf(NoteBlockItem.TextBlock())
+            }
+            val mutableBlocks = currentBlocks.toMutableList()
+            val textBlockIdx = mutableBlocks.indexOfFirst { it is NoteBlockItem.TextBlock }
+            if (textBlockIdx != -1) {
+                val tb = mutableBlocks[textBlockIdx] as NoteBlockItem.TextBlock
+                val tfv = tb.textFieldValue
+                val start = if (tfv.selection.start == tfv.selection.end) 0 else tfv.selection.start
+                val end = if (tfv.selection.start == tfv.selection.end) tfv.text.length else tfv.selection.end
+                val newAnnotated = applyStyleToAnnotatedString(
+                    current = tfv.annotatedString,
+                    selectionStart = start,
+                    selectionEnd = end,
+                    formatType = formatType,
+                    colorValue = colorValue,
+                    sizeOffset = sizeOffset,
+                    fontFamilyValue = fontFamilyValue
+                )
+                mutableBlocks[textBlockIdx] = tb.copy(textFieldValue = tfv.copy(annotatedString = newAnnotated))
+                currentBlocks = mutableBlocks
+            }
         }
     }
 
     fun undo() {
         if (undoStack.isNotEmpty()) {
-            redoStack = redoStack + editingTextFieldValue
-            editingTextFieldValue = undoStack.last()
+            val previous = undoStack.last()
+            redoStack = (redoStack + listOf(currentBlocks)).takeLast(30)
             undoStack = undoStack.dropLast(1)
+            currentBlocks = previous
         }
     }
 
     fun redo() {
         if (redoStack.isNotEmpty()) {
-            undoStack = undoStack + editingTextFieldValue
-            editingTextFieldValue = redoStack.last()
+            val next = redoStack.last()
+            undoStack = (undoStack + listOf(currentBlocks)).takeLast(30)
             redoStack = redoStack.dropLast(1)
-        }
-    }
-
-    LaunchedEffect(selectedDetailItem, isEditingDetail) {
-        if (isEditingDetail && selectedDetailItem != null) {
-            val annotated = htmlToAnnotatedString(selectedDetailItem!!.content)
-            editingTextFieldValue = TextFieldValue(
-                annotatedString = annotated,
-                selection = TextRange(0, annotated.text.length)
-            )
-            undoStack = emptyList()
-            redoStack = emptyList()
-        }
-    }
-
-    LaunchedEffect(isCreatingNewItem) {
-        if (isCreatingNewItem) {
-            editingTextFieldValue = TextFieldValue(
-                annotatedString = AnnotatedString(""),
-                selection = TextRange(0)
-            )
-            undoStack = emptyList()
-            redoStack = emptyList()
+            currentBlocks = next
         }
     }
 
     LaunchedEffect(isEditingDetail, isCreatingNewItem, selectedDetailItem) {
         showColorPalette = false
+        undoStack = emptyList()
+        redoStack = emptyList()
     }
 
     var isCustomizableMode by remember { mutableStateOf(false) }
@@ -581,16 +1262,17 @@ fun ClipboardOverlayContent(
     val focusRequester = remember { FocusRequester() }
 
     var expandedMenuItemId by remember { mutableStateOf<String?>(null) }
-    var overlayState by remember { mutableStateOf(ClipboardOverlayState.COLLAPSED) }
+    var overlayState by remember { mutableStateOf(if (isFullScreen) ClipboardOverlayState.EXPANDED else initialState) }
 
     LaunchedEffect(isEditingDetail, isCreatingNewItem) {
         if (isEditingDetail || isCreatingNewItem) {
             overlayState = ClipboardOverlayState.EXPANDED
         }
+        kotlinx.coroutines.delay(50)
         onKeyboardFocusRequested(isEditingDetail || isCreatingNewItem)
     }
 
-    var selectedTab by remember { mutableStateOf(0) } // 0: Недавние, 1: Все, 2: Заметки, 3: Избранное
+    var selectedFilters by remember { mutableStateOf(setOf<NoteFilter>()) }
     var visible by remember { mutableStateOf(false) }
 
     var isDragging by remember { mutableStateOf(false) }
@@ -600,15 +1282,17 @@ fun ClipboardOverlayContent(
         visible = true
     }
 
-    LaunchedEffect(selectedTab, searchQuery, isSearchActive, selectedDetailItem, isCreatingNewItem, isCustomizableMode) {
+    LaunchedEffect(selectedFilters, searchQuery, isSearchActive, selectedDetailItem, isCreatingNewItem, isCustomizableMode, showSettingsMenu) {
         expandedMenuItemId = null
     }
 
     val backDispatcherOwner = LocalOnBackPressedDispatcherOwner.current
     if (backDispatcherOwner != null) {
-        val isBackActive = isSearchActive || selectedDetailItem != null || isCreatingNewItem || isCustomizableMode || isMinimizedToCircle
+        val isBackActive = isSearchActive || selectedDetailItem != null || isCreatingNewItem || isCustomizableMode || isMinimizedToCircle || showSettingsMenu
         BackHandler(enabled = isBackActive) {
-            if (isMinimizedToCircle) {
+            if (showSettingsMenu) {
+                showSettingsMenu = false
+            } else if (isMinimizedToCircle) {
                 isMinimizedToCircle = false
             } else if (isCustomizableMode) {
                 isCustomizableMode = false
@@ -675,19 +1359,38 @@ fun ClipboardOverlayContent(
         }
     }
 
-    val tabFiltered = remember(displayItems, selectedTab) {
-        when (selectedTab) {
-            0 -> displayItems.filter { currentTime - itemTimestamp(it) <= 24 * 3600 * 1000L } // Недавние
-            1 -> displayItems // Все (бывшая история)
-            2 -> displayItems.filter { it.isNote } // Заметки
-            3 -> displayItems.filter { it.isPinned } // Избранное
-            else -> displayItems
-        }
-    }
+    val filteredItems = remember(displayItems, selectedFilters, searchQuery) {
+        var items = displayItems
 
-    val filteredItems = remember(tabFiltered, searchQuery) {
-        if (searchQuery.isBlank()) tabFiltered
-        else tabFiltered.filter { it.content.contains(searchQuery, ignoreCase = true) }
+        if (selectedFilters.isNotEmpty()) {
+            items = items.filter { item ->
+                var matches = true
+                for (filter in selectedFilters) {
+                    val pass = when (filter) {
+                        NoteFilter.ALL -> true
+                        NoteFilter.CLIPBOARD -> !item.isNote
+                        NoteFilter.NOTES -> item.isNote
+                        NoteFilter.FAVORITES -> item.isPinned
+                        NoteFilter.LINKS -> hasLink(item.content)
+                        NoteFilter.FORMATTED -> hasFormatting(item.content)
+                        NoteFilter.PLAIN_TEXT -> !hasFormatting(item.content)
+                        NoteFilter.SHORT -> stripHtmlAndStructures(item.content).lines().filter { l -> l.isNotBlank() }.size <= 5
+                        NoteFilter.LONG -> stripHtmlAndStructures(item.content).lines().filter { l -> l.isNotBlank() }.size > 5
+                    }
+                    if (!pass) {
+                        matches = false
+                        break
+                    }
+                }
+                matches
+            }
+        }
+
+        if (searchQuery.isNotBlank()) {
+            items = items.filter { it.content.contains(searchQuery, ignoreCase = true) }
+        }
+
+        items
     }
 
     val groupedItems = remember(filteredItems) {
@@ -934,7 +1637,7 @@ fun ClipboardOverlayContent(
 
                                 Button(
                                     onClick = {
-                                        val finalContent = annotatedStringToHtml(editingTextFieldValue.annotatedString)
+                                        val finalContent = buildContentFromBlocks(currentBlocks)
                                         if (finalContent.isNotBlank()) {
                                             val newId = ClipboardHistoryManager.addItemAndGetId(context, finalContent, "text", isNote = true)
                                             if (isScreenLocked) {
@@ -953,165 +1656,244 @@ fun ClipboardOverlayContent(
 
                             Spacer(modifier = Modifier.height(8.dp))
 
-                            OutlinedTextField(
-                                value = editingTextFieldValue,
-                                onValueChange = { newValue ->
-                                    val updated = preserveSpansOnTextChange(editingTextFieldValue.annotatedString, newValue)
-                                    if (updated.text != editingTextFieldValue.text) {
-                                        val now = System.currentTimeMillis()
-                                        val isWordBoundary = updated.text.endsWith(" ") || updated.text.endsWith("\n") || updated.text.length < editingTextFieldValue.text.length
-                                        val isPause = (now - lastEditTimestamp) > 700L
-                                        if (isWordBoundary || isPause || undoStack.isEmpty()) {
-                                            pushUndoState()
-                                        }
-                                        lastEditTimestamp = now
-                                    }
-                                    editingTextFieldValue = updated
-                                },
+                            OverlayBlocksRenderer(
+                                itemId = "new",
+                                blocksList = currentBlocks,
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .weight(1f)
-                                    .focusRequester(focusRequester),
-                                placeholder = { Text("Введите текст записи...", color = Color.Gray, fontSize = 14.sp) },
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedBorderColor = yellowColor,
-                                    unfocusedBorderColor = grayBorder,
-                                    focusedTextColor = Color.White,
-                                    unfocusedTextColor = Color.White,
-                                    cursorColor = yellowColor
-                                ),
-                                shape = RoundedCornerShape(14.dp)
+                                    .weight(1f),
+                                isEditing = true,
+                                onBlocksChanged = { newBlocks ->
+                                    currentBlocks = newBlocks
+                                },
+                                focusRequester = focusRequester
                             )
 
                             LaunchedEffect(Unit) {
-                                focusRequester.requestFocus()
+                                kotlinx.coroutines.delay(150)
+                                try {
+                                    focusRequester.requestFocus()
+                                } catch (e: Exception) {}
                             }
                         } else if (selectedDetailItem != null) {
                             val item = selectedDetailItem!!
-                            if (isEditingDetail) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    IconButton(onClick = { isEditingDetail = false }) {
-                                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
-                                    }
-
-                                    Text(
-                                        text = "Редактирование",
-                                        color = Color.White,
-                                        fontSize = 16.sp,
-                                        style = MaterialTheme.typography.titleMedium
-                                    )
-
-                                    Button(
-                                        onClick = {
-                                            val finalContent = annotatedStringToHtml(editingTextFieldValue.annotatedString)
-                                            if (finalContent.isNotBlank()) {
-                                                val updatedItem = item.copy(content = finalContent)
-                                                ClipboardHistoryManager.updateItem(context, updatedItem)
-                                                history = ClipboardHistoryManager.getHistory(context)
-                                                selectedDetailItem = null
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                // Left back button
+                                Box(
+                                    modifier = Modifier
+                                        .size(40.dp)
+                                        .clip(CircleShape)
+                                        .background(Color(0xFF333333))
+                                        .clickable {
+                                            if (isEditingDetail) {
                                                 isEditingDetail = false
+                                            } else {
+                                                selectedDetailItem = null
                                             }
                                         },
-                                        colors = ButtonDefaults.buttonColors(containerColor = Color.White),
-                                        shape = RoundedCornerShape(12.dp)
-                                    ) {
-                                        Text("Сохранить", color = Color.Black, fontSize = 13.sp)
-                                    }
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                        contentDescription = "Back",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(20.dp)
+                                    )
                                 }
 
-                                Spacer(modifier = Modifier.height(8.dp))
+                                // Title: "Заметка" vs "Редактирование"
+                                Text(
+                                    text = if (isEditingDetail) "Редактирование" else "Заметка",
+                                    color = Color.White,
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
 
-                                OutlinedTextField(
-                                    value = editingTextFieldValue,
-                                    onValueChange = { newValue ->
-                                        val updated = preserveSpansOnTextChange(editingTextFieldValue.annotatedString, newValue)
-                                        if (updated.text != editingTextFieldValue.text) {
-                                            val now = System.currentTimeMillis()
-                                            val isWordBoundary = updated.text.endsWith(" ") || updated.text.endsWith("\n") || updated.text.length < editingTextFieldValue.text.length
-                                            val isPause = (now - lastEditTimestamp) > 700L
-                                            if (isWordBoundary || isPause || undoStack.isEmpty()) {
-                                                pushUndoState()
-                                            }
-                                            lastEditTimestamp = now
-                                        }
-                                        editingTextFieldValue = updated
-                                    },
+                                // Right button: Pencil (in reading) or Check (in editing)
+                                if (isEditingDetail) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(40.dp)
+                                            .clip(CircleShape)
+                                            .background(Color.White)
+                                            .clickable {
+                                                val finalContent = buildContentFromBlocks(currentBlocks)
+                                                if (finalContent.isNotBlank()) {
+                                                    val updatedItem = item.copy(content = finalContent)
+                                                    ClipboardHistoryManager.updateItem(context, updatedItem)
+                                                    history = ClipboardHistoryManager.getHistory(context)
+                                                    selectedDetailItem = updatedItem
+                                                    isEditingDetail = false
+                                                }
+                                            },
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Check,
+                                            contentDescription = "Save",
+                                            tint = Color.Black,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+                                } else {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(40.dp)
+                                            .clip(CircleShape)
+                                            .background(Color(0xFF333333))
+                                            .clickable {
+                                                overlayState = ClipboardOverlayState.EXPANDED
+                                                currentBlocks = parseNoteContentToBlocks(item.content)
+                                                isEditingDetail = true
+                                            },
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Edit,
+                                            contentDescription = "Edit",
+                                            tint = Color.White,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            if (isEditingDetail) {
+                                OverlayBlocksRenderer(
+                                    itemId = item.id,
+                                    blocksList = currentBlocks,
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .weight(1f)
-                                        .focusRequester(focusRequester),
-                                    colors = OutlinedTextFieldDefaults.colors(
-                                        focusedBorderColor = yellowColor,
-                                        unfocusedBorderColor = grayBorder,
-                                        focusedTextColor = Color.White,
-                                        unfocusedTextColor = Color.White,
-                                        cursorColor = yellowColor
-                                    ),
-                                    shape = RoundedCornerShape(14.dp)
+                                        .weight(1f),
+                                    isEditing = true,
+                                    onBlocksChanged = { newBlocks ->
+                                        currentBlocks = newBlocks
+                                    },
+                                    focusRequester = focusRequester
                                 )
 
                                 LaunchedEffect(Unit) {
-                                    focusRequester.requestFocus()
+                                    kotlinx.coroutines.delay(150)
+                                    try {
+                                        focusRequester.requestFocus()
+                                    } catch (e: Exception) {}
                                 }
                             } else {
+                                OverlayBlocksRenderer(
+                                    content = item.content,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .weight(1f),
+                                    onTapTextToEdit = {
+                                        overlayState = ClipboardOverlayState.EXPANDED
+                                        currentBlocks = parseNoteContentToBlocks(item.content)
+                                        isEditingDetail = true
+                                    }
+                                )
+                            }
+                        } else if (showSettingsMenu) {
+                            Column(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(16.dp))
+                                    .background(Color(0xFF252525))
+                                    .border(1.dp, Color(0xFF333333), RoundedCornerShape(16.dp))
+                                    .padding(16.dp),
+                                verticalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    IconButton(onClick = { selectedDetailItem = null }) {
-                                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = yellowColor)
-                                    }
                                     Text(
-                                        text = formatTimestamp(item.timestamp),
-                                        color = Color(0xFFAAAAAA),
-                                        fontSize = 13.sp
+                                        text = "Функции оверлея",
+                                        color = Color.White,
+                                        fontSize = 16.sp,
+                                        fontWeight = FontWeight.Bold
                                     )
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        TextButton(onClick = {
-                                            ClipboardHistoryManager.copyToClipboard(context, item)
-                                            Toast.makeText(context, R.string.copied_to_clipboard, Toast.LENGTH_SHORT).show()
-                                        }) {
-                                            Text(stringResource(R.string.menu_copy), color = yellowColor, fontSize = 13.sp)
-                                        }
-                                        TextButton(onClick = {
-                                            onPasteItem(item.content)
-                                        }) {
-                                            Text(stringResource(R.string.menu_paste), color = yellowColor, fontSize = 13.sp)
-                                        }
+                                    Box(
+                                        modifier = Modifier
+                                            .size(32.dp)
+                                            .clip(CircleShape)
+                                            .background(Color(0xFF333333))
+                                            .clickable { showSettingsMenu = false },
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Close,
+                                            contentDescription = "Close Settings",
+                                            tint = Color.White,
+                                            modifier = Modifier.size(16.dp)
+                                        )
                                     }
                                 }
 
-                                Spacer(modifier = Modifier.height(8.dp))
+                                Spacer(modifier = Modifier.height(4.dp))
 
-                                Box(
+                                // Function item: Move / Resize (Перемещение)
+                                Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .weight(1f)
-                                        .clip(RoundedCornerShape(16.dp))
-                                        .background(Color(0xFF252525))
-                                        .clickable {
-                                            overlayState = ClipboardOverlayState.EXPANDED
-                                            val annotated = htmlToAnnotatedString(item.content)
-                                            editingTextFieldValue = TextFieldValue(
-                                                annotatedString = annotated,
-                                                selection = TextRange(0, annotated.text.length)
-                                            )
-                                            isEditingDetail = true
-                                        }
-                                        .padding(16.dp)
-                                        .verticalScroll(rememberScrollState())
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(if (isCustomizableMode) yellowColor.copy(alpha = 0.2f) else Color(0xFF1E1E1E))
+                                        .border(1.dp, if (isCustomizableMode) yellowColor else Color(0xFF333333), RoundedCornerShape(12.dp))
+                                        .combinedClickable(
+                                            onClick = {
+                                                isCustomizableMode = !isCustomizableMode
+                                                if (!isCustomizableMode) isCornerResizeActive = false
+                                                showSettingsMenu = false
+                                                Toast.makeText(
+                                                    context,
+                                                    if (isCustomizableMode) "Режим перемещения включен" else "Обычный режим",
+                                                    Toast.LENGTH_SHORT
+                                                ).show()
+                                            },
+                                            onLongClick = {
+                                                isCustomizableMode = true
+                                                isCornerResizeActive = true
+                                                showSettingsMenu = false
+                                                Toast.makeText(context, "Режим изменения углов активирован", Toast.LENGTH_SHORT).show()
+                                            }
+                                        )
+                                        .padding(14.dp),
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Text(
-                                        text = htmlToAnnotatedString(item.content),
-                                        color = Color.White,
-                                        fontSize = 15.sp,
-                                        lineHeight = 22.sp
-                                    )
+                                    Box(
+                                        modifier = Modifier
+                                            .size(36.dp)
+                                            .clip(CircleShape)
+                                            .background(if (isCustomizableMode) yellowColor else Color(0xFF333333)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.OpenWith,
+                                            contentDescription = "Move",
+                                            tint = if (isCustomizableMode) Color.Black else Color.White,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = "Перемещение и размер",
+                                            color = Color.White,
+                                            fontSize = 14.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        Text(
+                                            text = "Нажмите для перемещения, удержание — углы",
+                                            color = Color.Gray,
+                                            fontSize = 12.sp
+                                        )
+                                    }
                                 }
                             }
                         } else if (!isCompactMode) {
@@ -1164,60 +1946,59 @@ fun ClipboardOverlayContent(
                                             shape = RoundedCornerShape(14.dp)
                                         )
                                     } else {
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                        LazyRow(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .height(44.dp),
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp),
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
-                                            ScrollableTabRow(
-                                                selectedTabIndex = selectedTab,
-                                                containerColor = Color.Transparent,
-                                                contentColor = Color.White,
-                                                edgePadding = 0.dp,
-                                                modifier = Modifier.weight(1f),
-                                                indicator = { tabPositions ->
-                                                    if (selectedTab < tabPositions.size) {
-                                                        TabRowDefaults.SecondaryIndicator(
-                                                            Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
-                                                            color = Color.White
-                                                        )
+                                            items(NoteFilter.entries.toTypedArray(), key = { it.name }) { filter ->
+                                                val isAll = filter == NoteFilter.ALL
+                                                val isSelected = if (isAll) selectedFilters.isEmpty() else selectedFilters.contains(filter)
+                                                val showCross = isAll && selectedFilters.isNotEmpty()
+
+                                                Box(
+                                                    modifier = Modifier
+                                                        .height(34.dp)
+                                                        .clip(RoundedCornerShape(20.dp))
+                                                        .background(if (isSelected) Color.White else Color(0xFF1E1E1E))
+                                                        .border(1.dp, if (isSelected) Color.White else Color(0xFF333333), RoundedCornerShape(20.dp))
+                                                        .clickable {
+                                                            if (isAll) {
+                                                                selectedFilters = emptySet()
+                                                            } else {
+                                                                selectedFilters = if (selectedFilters.contains(filter)) {
+                                                                    selectedFilters - filter
+                                                                } else {
+                                                                    selectedFilters + filter
+                                                                }
+                                                            }
+                                                        }
+                                                        .padding(horizontal = 14.dp),
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    Row(
+                                                        verticalAlignment = Alignment.CenterVertically,
+                                                        horizontalArrangement = Arrangement.Center
+                                                    ) {
+                                                        if (showCross) {
+                                                            Icon(
+                                                                imageVector = Icons.Default.Close,
+                                                                contentDescription = "Reset filters",
+                                                                tint = Color.Gray,
+                                                                modifier = Modifier.size(16.dp)
+                                                            )
+                                                        } else {
+                                                            Text(
+                                                                text = filter.title,
+                                                                color = if (isSelected) Color.Black else Color.White,
+                                                                fontSize = 12.sp,
+                                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                                            )
+                                                        }
                                                     }
                                                 }
-                                            ) {
-                                                Tab(
-                                                    selected = selectedTab == 0,
-                                                    onClick = { selectedTab = 0 },
-                                                    text = { Text("Недавние", color = if (selectedTab == 0) Color.White else Color(0xFFAAAAAA), fontSize = 13.sp) }
-                                                )
-                                                Tab(
-                                                    selected = selectedTab == 1,
-                                                    onClick = { selectedTab = 1 },
-                                                    text = { Text("Все", color = if (selectedTab == 1) Color.White else Color(0xFFAAAAAA), fontSize = 13.sp) }
-                                                )
-                                                Tab(
-                                                    selected = selectedTab == 2,
-                                                    onClick = { selectedTab = 2 },
-                                                    text = { Text("Заметки", color = if (selectedTab == 2) Color.White else Color(0xFFAAAAAA), fontSize = 13.sp) }
-                                                )
-                                                Tab(
-                                                    selected = selectedTab == 3,
-                                                    onClick = { selectedTab = 3 },
-                                                    text = { Text("Избранное", color = if (selectedTab == 3) Color.White else Color(0xFFAAAAAA), fontSize = 13.sp) }
-                                                )
-                                            }
-
-                                            IconButton(
-                                                onClick = {
-                                                    expandedMenuItemId = null
-                                                    isSearchActive = true
-                                                },
-                                                modifier = Modifier.size(40.dp)
-                                            ) {
-                                                Icon(
-                                                    imageVector = Icons.Default.Search,
-                                                    contentDescription = "Search",
-                                                    tint = yellowColor
-                                                )
                                             }
                                         }
                                     }
@@ -1259,7 +2040,7 @@ fun ClipboardOverlayContent(
                                         items(itemsForDate, key = { it.id }) { item ->
                                             ClipboardCard(
                                                 item = item,
-                                                showStarIcon = selectedTab != 3,
+                                                showStarIcon = !selectedFilters.contains(NoteFilter.FAVORITES),
                                                 isMenuExpanded = expandedMenuItemId == item.id,
                                                 onToggleMenu = {
                                                     expandedMenuItemId = if (expandedMenuItemId == item.id) null else item.id
@@ -1298,25 +2079,40 @@ fun ClipboardOverlayContent(
 
                         Spacer(modifier = Modifier.height(8.dp))
 
+                        if (isEditingOrCreating && showSizeMenu) {
+                            SizeSliderBar(
+                                currentSizeOffset = currentSizeOffset,
+                                onSizeChanged = { newOffset ->
+                                    currentSizeOffset = newOffset
+                                    handleFormatAction(FormatType.SIZE, sizeOffset = newOffset)
+                                }
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                        }
+
+                        if (isEditingOrCreating && showFontMenu) {
+                            FontSelectionBar(
+                                activeFont = activeFontName,
+                                onSelectFont = { fontItem ->
+                                    activeFontName = fontItem.id
+                                    handleFormatAction(FormatType.FONT, fontFamilyValue = fontItem.fontFamily)
+                                    showFontMenu = false
+                                }
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                        }
+
                         if (isEditingOrCreating && showColorPalette) {
                             ColorPaletteBar(
                                 palette = defaultColorPalette,
                                 activeColor = activeColor,
                                 onSelectColor = { paletteItem ->
-                                    pushUndoState()
                                     val newColor = if (paletteItem.isClear) Color.Unspecified else paletteItem.color
                                     if (!paletteItem.isClear) {
                                         activeColor = newColor
                                     }
                                     val format = if (paletteItem.isClear) FormatType.CLEAR else FormatType.COLOR
-                                    val newAnnotated = applyStyleToAnnotatedString(
-                                        current = editingTextFieldValue.annotatedString,
-                                        selectionStart = editingTextFieldValue.selection.start,
-                                        selectionEnd = editingTextFieldValue.selection.end,
-                                        formatType = format,
-                                        colorValue = newColor
-                                    )
-                                    editingTextFieldValue = editingTextFieldValue.copy(annotatedString = newAnnotated)
+                                    handleFormatAction(format, colorValue = newColor)
                                     showColorPalette = false
                                 }
                             )
@@ -1403,16 +2199,8 @@ fun ClipboardOverlayContent(
                                             .size(40.dp)
                                             .combinedClickable(
                                                 onClick = {
-                                                    pushUndoState()
                                                     val colorToApply = if (activeColor == Color.Unspecified) Color(0xFFFF3B30) else activeColor
-                                                    val newAnnotated = applyStyleToAnnotatedString(
-                                                        current = editingTextFieldValue.annotatedString,
-                                                        selectionStart = editingTextFieldValue.selection.start,
-                                                        selectionEnd = editingTextFieldValue.selection.end,
-                                                        formatType = FormatType.COLOR,
-                                                        colorValue = colorToApply
-                                                    )
-                                                    editingTextFieldValue = editingTextFieldValue.copy(annotatedString = newAnnotated)
+                                                    handleFormatAction(FormatType.COLOR, colorValue = colorToApply)
                                                 },
                                                 onLongClick = {
                                                     showColorPalette = !showColorPalette
@@ -1435,14 +2223,7 @@ fun ClipboardOverlayContent(
                                     // 4. Italic
                                     Surface(
                                         onClick = {
-                                            pushUndoState()
-                                            val newAnnotated = applyStyleToAnnotatedString(
-                                                current = editingTextFieldValue.annotatedString,
-                                                selectionStart = editingTextFieldValue.selection.start,
-                                                selectionEnd = editingTextFieldValue.selection.end,
-                                                formatType = FormatType.ITALIC
-                                            )
-                                            editingTextFieldValue = editingTextFieldValue.copy(annotatedString = newAnnotated)
+                                            handleFormatAction(FormatType.ITALIC)
                                         },
                                         shape = CircleShape,
                                         color = Color(0xFF333333),
@@ -1461,14 +2242,7 @@ fun ClipboardOverlayContent(
                                     // 5. Bold
                                     Surface(
                                         onClick = {
-                                            pushUndoState()
-                                            val newAnnotated = applyStyleToAnnotatedString(
-                                                current = editingTextFieldValue.annotatedString,
-                                                selectionStart = editingTextFieldValue.selection.start,
-                                                selectionEnd = editingTextFieldValue.selection.end,
-                                                formatType = FormatType.BOLD
-                                            )
-                                            editingTextFieldValue = editingTextFieldValue.copy(annotatedString = newAnnotated)
+                                            handleFormatAction(FormatType.BOLD)
                                         },
                                         shape = CircleShape,
                                         color = Color(0xFF333333),
@@ -1487,14 +2261,7 @@ fun ClipboardOverlayContent(
                                     // 6. Underline
                                     Surface(
                                         onClick = {
-                                            pushUndoState()
-                                            val newAnnotated = applyStyleToAnnotatedString(
-                                                current = editingTextFieldValue.annotatedString,
-                                                selectionStart = editingTextFieldValue.selection.start,
-                                                selectionEnd = editingTextFieldValue.selection.end,
-                                                formatType = FormatType.UNDERLINE
-                                            )
-                                            editingTextFieldValue = editingTextFieldValue.copy(annotatedString = newAnnotated)
+                                            handleFormatAction(FormatType.UNDERLINE)
                                         },
                                         shape = CircleShape,
                                         color = Color(0xFF333333),
@@ -1510,17 +2277,68 @@ fun ClipboardOverlayContent(
                                         }
                                     }
 
-                                    // 7. Clear Format (Eraser)
+                                    // 7. Size
+                                    Surface(
+                                        modifier = Modifier
+                                            .size(40.dp)
+                                            .combinedClickable(
+                                                onClick = {
+                                                    showSizeMenu = !showSizeMenu
+                                                    showFontMenu = false
+                                                    showColorPalette = false
+                                                },
+                                                onLongClick = {
+                                                    showSizeMenu = !showSizeMenu
+                                                    showFontMenu = false
+                                                    showColorPalette = false
+                                                }
+                                            ),
+                                        shape = CircleShape,
+                                        color = if (showSizeMenu) yellowColor else Color(0xFF333333)
+                                    ) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Icon(
+                                                imageVector = Icons.Default.FormatSize,
+                                                contentDescription = "Text Size",
+                                                tint = if (showSizeMenu) Color.Black else Color.White,
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                        }
+                                    }
+
+                                    // 8. Font
+                                    Surface(
+                                        modifier = Modifier
+                                            .size(40.dp)
+                                            .combinedClickable(
+                                                onClick = {
+                                                    showFontMenu = !showFontMenu
+                                                    showSizeMenu = false
+                                                    showColorPalette = false
+                                                },
+                                                onLongClick = {
+                                                    showFontMenu = !showFontMenu
+                                                    showSizeMenu = false
+                                                    showColorPalette = false
+                                                }
+                                            ),
+                                        shape = CircleShape,
+                                        color = if (showFontMenu) yellowColor else Color(0xFF333333)
+                                    ) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Icon(
+                                                imageVector = Icons.Default.TextFields,
+                                                contentDescription = "Font Family",
+                                                tint = if (showFontMenu) Color.Black else Color.White,
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                        }
+                                    }
+
+                                    // 9. Clear Format (Eraser)
                                     Surface(
                                         onClick = {
-                                            pushUndoState()
-                                            val newAnnotated = applyStyleToAnnotatedString(
-                                                current = editingTextFieldValue.annotatedString,
-                                                selectionStart = editingTextFieldValue.selection.start,
-                                                selectionEnd = editingTextFieldValue.selection.end,
-                                                formatType = FormatType.CLEAR
-                                            )
-                                            editingTextFieldValue = editingTextFieldValue.copy(annotatedString = newAnnotated)
+                                            handleFormatAction(FormatType.CLEAR)
                                             Toast.makeText(context, "Формат сброшен", Toast.LENGTH_SHORT).show()
                                         },
                                         shape = CircleShape,
@@ -1561,161 +2379,112 @@ fun ClipboardOverlayContent(
                                     }
                                 }
                             } else {
-                                Row(
+                                Box(
                                     modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
+                                    contentAlignment = Alignment.Center
                                 ) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        // 1. Minimize to Circle button (Arrow forward with spring collapse animation)
-                                        Surface(
-                                            onClick = {
-                                                expandedMenuItemId = null
-                                                scope.launch {
-                                                    overlayState = ClipboardOverlayState.MINIMAL
-                                                    kotlinx.coroutines.delay(180)
-                                                    transitionProgress.animateTo(
-                                                        targetValue = 1f,
-                                                        animationSpec = spring(
-                                                            dampingRatio = Spring.DampingRatioMediumBouncy,
-                                                            stiffness = Spring.StiffnessLow
-                                                        )
-                                                    )
-                                                    isMinimizedToCircle = true
-                                                    transitionProgress.snapTo(0f)
-                                                }
-                                            },
-                                            shape = CircleShape,
-                                            color = Color(0xFF333333),
-                                            border = null,
-                                            modifier = Modifier.size(40.dp)
-                                        ) {
-                                            Box(contentAlignment = Alignment.Center) {
-                                                Icon(
-                                                    imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                                                    contentDescription = "Minimize to Circle",
-                                                    tint = Color.White,
-                                                    modifier = Modifier.size(20.dp)
-                                                )
-                                            }
-                                        }
-
-                                        Spacer(modifier = Modifier.width(8.dp))
-
-                                        // 2. Customizable mode button
-                                        Surface(
+                                    // Left: Settings (Gear) + Minimize
+                                    Row(
+                                        modifier = Modifier.align(Alignment.CenterStart),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        // 1. Settings button (Gear)
+                                        Box(
                                             modifier = Modifier
                                                 .size(40.dp)
-                                                .combinedClickable(
-                                                    onClick = {
-                                                        expandedMenuItemId = null
-                                                        isCustomizableMode = !isCustomizableMode
-                                                        if (!isCustomizableMode) isCornerResizeActive = false
-                                                        Toast.makeText(
-                                                            context,
-                                                            if (isCustomizableMode) "Режим перемещения включен" else "Обычный режим",
-                                                            Toast.LENGTH_SHORT
-                                                        ).show()
-                                                    },
-                                                    onLongClick = {
-                                                        expandedMenuItemId = null
-                                                        isCustomizableMode = true
-                                                        isCornerResizeActive = true
-                                                        Toast.makeText(context, "Режим изменения углов активирован", Toast.LENGTH_SHORT).show()
-                                                    }
-                                                ),
-                                            shape = CircleShape,
-                                            color = if (isCustomizableMode) yellowColor else Color(0xFF333333),
-                                            border = if (isCornerResizeActive) BorderStroke(2.dp, Color.White) else null
+                                                .clip(CircleShape)
+                                                .background(if (showSettingsMenu) yellowColor else Color(0xFF333333))
+                                                .clickable {
+                                                    expandedMenuItemId = null
+                                                    showSettingsMenu = !showSettingsMenu
+                                                },
+                                            contentAlignment = Alignment.Center
                                         ) {
-                                            Box(contentAlignment = Alignment.Center) {
-                                                Icon(
-                                                    imageVector = Icons.Default.OpenWith,
-                                                    contentDescription = "Move / Resize Mode",
-                                                    tint = if (isCustomizableMode) Color.Black else Color.White,
-                                                    modifier = Modifier.size(20.dp)
-                                                )
-                                            }
-                                        }
-
-                                        Spacer(modifier = Modifier.width(8.dp))
-
-                                        // 3. Force Sync button
-                                        Surface(
-                                            onClick = {
-                                                expandedMenuItemId = null
-                                                try {
-                                                    val synced = ClipboardHistoryManager.syncSystemClipboard(context)
-                                                    if (synced) {
-                                                        history = ClipboardHistoryManager.getHistory(context)
-                                                        Toast.makeText(context, "Скопировано из буфера", Toast.LENGTH_SHORT).show()
-                                                    } else {
-                                                        Toast.makeText(context, "Буфер обмена пуст или это скриншот", Toast.LENGTH_SHORT).show()
-                                                    }
-                                                } catch (e: Exception) {
-                                                    Log.e("ClipboardOverlay", "Sync failed", e)
-                                                }
-                                            },
-                                            shape = CircleShape,
-                                            color = Color(0xFF333333),
-                                            border = null,
-                                            modifier = Modifier.size(40.dp)
-                                        ) {
-                                            Box(contentAlignment = Alignment.Center) {
-                                                Icon(
-                                                    imageVector = Icons.Default.Sync,
-                                                    contentDescription = "Sync",
-                                                    tint = Color.White,
-                                                    modifier = Modifier.size(20.dp)
-                                                )
-                                            }
-                                        }
-
-                                        Spacer(modifier = Modifier.width(8.dp))
-
-                                        // 4. Plus button (Create new item)
-                                        Surface(
-                                            onClick = {
-                                                expandedMenuItemId = null
-                                                overlayState = ClipboardOverlayState.EXPANDED
-                                                isCreatingNewItem = true
-                                            },
-                                            shape = CircleShape,
-                                            color = Color(0xFF333333),
-                                            border = null,
-                                            modifier = Modifier.size(40.dp)
-                                        ) {
-                                            Box(contentAlignment = Alignment.Center) {
-                                                Icon(
-                                                    imageVector = Icons.Default.Add,
-                                                    contentDescription = "Add",
-                                                    tint = Color.White,
-                                                    modifier = Modifier.size(20.dp)
-                                                )
-                                            }
-                                        }
-                                    }
-
-                                    // Close button
-                                    Surface(
-                                        onClick = {
-                                            expandedMenuItemId = null
-                                            visible = false
-                                            onDismiss()
-                                        },
-                                        shape = CircleShape,
-                                        color = Color(0xFF333333),
-                                        border = null,
-                                        modifier = Modifier.size(40.dp)
-                                    ) {
-                                        Box(contentAlignment = Alignment.Center) {
                                             Icon(
-                                                imageVector = Icons.Default.Close,
-                                                contentDescription = "Close",
+                                                imageVector = Icons.Default.Settings,
+                                                contentDescription = "Settings",
+                                                tint = if (showSettingsMenu) Color.Black else Color.White,
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                        }
+
+                                        Spacer(modifier = Modifier.width(8.dp))
+
+                                        // 2. Minimize to Circle button
+                                        Box(
+                                            modifier = Modifier
+                                                .size(40.dp)
+                                                .clip(CircleShape)
+                                                .background(Color(0xFF333333))
+                                                .clickable {
+                                                    expandedMenuItemId = null
+                                                    scope.launch {
+                                                        overlayState = ClipboardOverlayState.MINIMAL
+                                                        kotlinx.coroutines.delay(180)
+                                                        transitionProgress.animateTo(
+                                                            targetValue = 1f,
+                                                            animationSpec = spring(
+                                                                dampingRatio = Spring.DampingRatioMediumBouncy,
+                                                                stiffness = Spring.StiffnessLow
+                                                            )
+                                                        )
+                                                        isMinimizedToCircle = true
+                                                        transitionProgress.snapTo(0f)
+                                                    }
+                                                },
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                                                contentDescription = "Minimize to Circle",
                                                 tint = Color.White,
                                                 modifier = Modifier.size(20.dp)
                                             )
                                         }
+                                    }
+
+                                    // Center: Plus button (strictly centered across panel width, with circular background and white icon)
+                                    Box(
+                                        modifier = Modifier
+                                            .size(40.dp)
+                                            .clip(CircleShape)
+                                            .background(Color(0xFF333333))
+                                            .clickable {
+                                                expandedMenuItemId = null
+                                                showSettingsMenu = false
+                                                overlayState = ClipboardOverlayState.EXPANDED
+                                                isCreatingNewItem = true
+                                            },
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Add,
+                                            contentDescription = "Add",
+                                            tint = Color.White,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+
+                                    // Right: Close button
+                                    Box(
+                                        modifier = Modifier
+                                            .align(Alignment.CenterEnd)
+                                            .size(40.dp)
+                                            .clip(CircleShape)
+                                            .background(Color(0xFF333333))
+                                            .clickable {
+                                                expandedMenuItemId = null
+                                                visible = false
+                                                onDismiss()
+                                            },
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Close,
+                                            contentDescription = "Close",
+                                            tint = Color.White,
+                                            modifier = Modifier.size(20.dp)
+                                        )
                                     }
                                 }
                             }
@@ -1786,12 +2555,42 @@ fun ClipboardOverlayContent(
     }
 }
 
+fun extractCleanNoteText(content: String): AnnotatedString {
+    if (content.isBlank()) return AnnotatedString("")
+    val trimmed = content.trim()
+    if (trimmed.startsWith("{") && trimmed.endsWith("}")) {
+        try {
+            val blocks = parseNoteContentToBlocks(trimmed)
+            val textBlocks = blocks.filterIsInstance<NoteBlockItem.TextBlock>()
+            if (textBlocks.isNotEmpty()) {
+                val sb = StringBuilder()
+                val spans = mutableListOf<AnnotatedString.Range<SpanStyle>>()
+                textBlocks.forEachIndexed { i, textBlock ->
+                    val startOffset = sb.length
+                    val annotated = textBlock.textFieldValue.annotatedString
+                    sb.append(annotated.text)
+                    for (span in annotated.spanStyles) {
+                        spans.add(AnnotatedString.Range(span.item, span.start + startOffset, span.end + startOffset))
+                    }
+                    if (i < textBlocks.size - 1) {
+                        sb.append("\n")
+                    }
+                }
+                return AnnotatedString(text = sb.toString(), spanStyles = spans)
+            }
+        } catch (e: Exception) {}
+    }
+    return htmlToAnnotatedString(content)
+}
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ClipboardCard(
     item: ClipboardItem,
     showStarIcon: Boolean = true,
     isMenuExpanded: Boolean = false,
+    isNoteStyle: Boolean = false,
+    maxLines: Int = 3,
     onToggleMenu: () -> Unit,
     onTap: () -> Unit,
     onCopy: () -> Unit,
@@ -1849,7 +2648,7 @@ fun ClipboardCard(
                             text = htmlToAnnotatedString(item.content),
                             color = Color.White,
                             fontSize = 14.sp,
-                            maxLines = 3,
+                            maxLines = maxLines,
                             overflow = TextOverflow.Ellipsis
                         )
                     }

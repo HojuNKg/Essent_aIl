@@ -5,6 +5,8 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.widget.Toast
+import androidx.core.content.res.ResourcesCompat
+import androidx.compose.ui.text.font.Typeface
 import org.json.JSONArray
 import org.json.JSONObject
 import androidx.activity.compose.BackHandler
@@ -23,8 +25,11 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -73,8 +78,9 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.zIndex
 import com.HojuNK.essent_all.ClipboardHistoryManager
+import com.HojuNK.essent_all.ClipboardItem
 import com.HojuNK.essent_all.R
-import com.HojuNK.essent_all.model.ClipboardItem
+import com.HojuNK.essent_all.model.LocalOrientationLock
 import com.HojuNK.essent_all.ui.components.ColorPaletteBar
 import com.HojuNK.essent_all.ui.components.TypewriterTitle
 import com.HojuNK.essent_all.ui.components.defaultColorPalette
@@ -147,13 +153,81 @@ enum class FormatType {
     BOLD, ITALIC, UNDERLINE, COLOR, SIZE, FONT, CLEAR
 }
 
-val NdotFontFamily = try {
-    val field = R.font::class.java.getField("ndot55")
-    val resId = field.getInt(null)
-    FontFamily(Font(resId))
-} catch (e: Exception) {
-    FontFamily.Monospace
+class FontItem(
+    val id: String,
+    val displayName: String,
+    val fontFamily: FontFamily?
+) {
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is FontItem) return false
+        return id == other.id
+    }
+
+    override fun hashCode(): Int {
+        return id.hashCode()
+    }
 }
+
+object FontManager {
+    val Ndot55FontFamily = FontFamily.Monospace
+
+    val Ndot57CapsFontFamily = try {
+        FontFamily(Font(R.font.ndot57caps_regular))
+    } catch (e: Throwable) {
+        FontFamily.Monospace
+    }
+
+    val Ndot77JpFontFamily = FontFamily.Monospace
+
+    fun getAvailableFonts(context: Context? = null): List<FontItem> {
+        return listOf(
+            FontItem("system", "Системный", null),
+            FontItem("monospace", "Моноширинный", FontFamily.Monospace),
+            FontItem("ndot55", "Ndot 55", Ndot55FontFamily),
+            FontItem("ndot57caps_regular", "Ndot 57 Caps", Ndot57CapsFontFamily),
+            FontItem("ndot77jpextended", "Ndot 77 JP", Ndot77JpFontFamily)
+        )
+    }
+
+    fun getFontFamilyById(fontId: String, context: Context? = null): FontFamily? {
+        return when (fontId) {
+            "system" -> null
+            "monospace" -> FontFamily.Monospace
+            "ndot55" -> Ndot55FontFamily
+            "ndot57caps_regular" -> Ndot57CapsFontFamily
+            "ndot77jpextended" -> Ndot77JpFontFamily
+            else -> null
+        }
+    }
+
+    fun getFontIdByFamily(fontFamily: FontFamily?, context: Context? = null): String {
+        return when (fontFamily) {
+            null -> "system"
+            FontFamily.Monospace -> "monospace"
+            Ndot55FontFamily -> "ndot55"
+            Ndot57CapsFontFamily -> "ndot57caps_regular"
+            Ndot77JpFontFamily -> "ndot77jpextended"
+            else -> "system"
+        }
+    }
+
+    fun formatFontDisplayName(rawName: String): String {
+        if (rawName.equals("ndot55", ignoreCase = true)) return "Ndot 55"
+        if (rawName.equals("ndot57caps_regular", ignoreCase = true)) return "Ndot 57 Caps"
+        if (rawName.equals("ndot77jpextended", ignoreCase = true)) return "Ndot 77 JP"
+        if (rawName.equals("system", ignoreCase = true)) return "Системный"
+        if (rawName.equals("monospace", ignoreCase = true)) return "Моноширинный"
+        return rawName
+    }
+}
+
+fun getSafeTargetBlockIndex(focusedIndex: Int, blocks: List<NoteBlockItem>): Int {
+    if (blocks.isEmpty()) return -1
+    return focusedIndex.coerceIn(0, blocks.size - 1)
+}
+
+val NdotFontFamily = FontManager.getFontFamilyById("ndot55") ?: FontFamily.Monospace
 
 @Composable
 fun AdvancedColorPickerDialog(
@@ -289,8 +363,10 @@ fun SizeSliderBar(
 @Composable
 fun FontSelectionBar(
     activeFont: String,
-    onSelectFont: (String) -> Unit
+    onSelectFont: (FontItem) -> Unit
 ) {
+    val fonts = remember { FontManager.getAvailableFonts() }
+
     Surface(
         shape = RoundedCornerShape(16.dp),
         color = Color(0xFF2C2C2C),
@@ -300,18 +376,81 @@ fun FontSelectionBar(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
                 .padding(horizontal = 12.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            FontOptionItem(title = "Системный", isSelected = activeFont == "system", onClick = { onSelectFont("system") })
-            FontOptionItem(title = "Ndot 55", isSelected = activeFont == "ndot55", onClick = { onSelectFont("ndot55") })
+            fonts.forEach { fontItem ->
+                FontOptionItem(
+                    title = fontItem.displayName,
+                    fontFamily = fontItem.fontFamily,
+                    isSelected = (activeFont == fontItem.id) || (activeFont.isEmpty() && fontItem.id == "system"),
+                    onClick = { onSelectFont(fontItem) }
+                )
+            }
         }
     }
 }
 
+fun applyFontToAnnotatedString(
+    annotatedString: AnnotatedString,
+    selectionStart: Int,
+    selectionEnd: Int,
+    fontFamily: FontFamily?
+): AnnotatedString {
+    val text = annotatedString.text
+    if (text.isEmpty()) return annotatedString
+
+    val startRaw = minOf(selectionStart, selectionEnd).coerceIn(0, text.length)
+    val endRaw = maxOf(selectionStart, selectionEnd).coerceIn(0, text.length)
+
+    val start = if (startRaw == endRaw) 0 else startRaw
+    val end = if (startRaw == endRaw) text.length else endRaw
+
+    if (start >= end) return annotatedString
+
+    val existingSpans = annotatedString.spanStyles.toMutableList()
+    val newSpans = mutableListOf<AnnotatedString.Range<SpanStyle>>()
+
+    for (range in existingSpans) {
+        val rStart = range.start
+        val rEnd = range.end
+        val style = range.item
+
+        val noOverlap = rEnd <= start || rStart >= end
+        if (noOverlap) {
+            newSpans.add(range)
+        } else {
+            if (rStart < start) {
+                newSpans.add(AnnotatedString.Range(style, rStart, start))
+            }
+            if (rEnd > end) {
+                newSpans.add(AnnotatedString.Range(style, end, rEnd))
+            }
+
+            val overlapStart = maxOf(rStart, start)
+            val overlapEnd = minOf(rEnd, end)
+            val updatedStyle = style.copy(fontFamily = fontFamily)
+            newSpans.add(AnnotatedString.Range(updatedStyle, overlapStart, overlapEnd))
+        }
+    }
+
+    val hasOverlap = existingSpans.any { it.start < end && it.end > start }
+    if (!hasOverlap) {
+        newSpans.add(AnnotatedString.Range(SpanStyle(fontFamily = fontFamily), start, end))
+    }
+
+    return AnnotatedString(text = text, spanStyles = mergeAdjacentSpans(newSpans))
+}
+
 @Composable
-fun FontOptionItem(title: String, isSelected: Boolean, onClick: () -> Unit) {
+fun FontOptionItem(
+    title: String,
+    fontFamily: FontFamily? = null,
+    isSelected: Boolean,
+    onClick: () -> Unit
+) {
     Surface(
         onClick = onClick,
         shape = RoundedCornerShape(12.dp),
@@ -321,6 +460,7 @@ fun FontOptionItem(title: String, isSelected: Boolean, onClick: () -> Unit) {
         Box(modifier = Modifier.padding(horizontal = 16.dp), contentAlignment = Alignment.Center) {
             Text(
                 text = title,
+                fontFamily = fontFamily,
                 color = if (isSelected) Color.Black else Color.White,
                 fontSize = 13.sp,
                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
@@ -383,7 +523,7 @@ fun applyStructureToTextBlock(
     val bulletRegex = Regex("""^(•|-|\*)\s+""")
     val numberRegex = Regex("""^(\d+\.|\d+\))\s+""")
     val checkboxRegex = Regex("""^(☐|☑|\[\s*\]|\[x\])\s+""")
-    val anyPrefixRegex = Regex("""^(•|-|\*|\d+\.|\d+\)|☐|☑|\[\s*\]|\[x\])\s+""")
+    val anyPrefixRegex = Regex("""^((•|-|\*|\d+\.|\d+\)|☐|☑|\[\s*\]|\[x\])\s*)+""")
 
     val allAlreadyHaveTarget = affectedLineIndices.all { idx ->
         val line = lines[idx]
@@ -520,54 +660,56 @@ fun ReadingTextBlockContent(
     val checkboxRegex = Regex("""^(☐|☑)\s+""")
 
     var lineStart = 0
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        lines.forEachIndexed { lineIdx, line ->
-            val lineEnd = lineStart + line.length
-            val lineAnnotated = annotatedString.subSequence(
-                lineStart.coerceIn(0, fullText.length),
-                lineEnd.coerceIn(0, fullText.length)
-            )
-            lineStart = lineEnd + 1
-
-            val match = checkboxRegex.find(line)
-            if (match != null) {
-                val isChecked = match.value.startsWith("☑")
-                val prefixLength = match.value.length
-                val contentAnnotated = lineAnnotated.subSequence(
-                    prefixLength.coerceIn(0, lineAnnotated.length),
-                    lineAnnotated.length
+    SelectionContainer {
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            lines.forEachIndexed { lineIdx, line ->
+                val lineEnd = lineStart + line.length
+                val lineAnnotated = annotatedString.subSequence(
+                    lineStart.coerceIn(0, fullText.length),
+                    lineEnd.coerceIn(0, fullText.length)
                 )
+                lineStart = lineEnd + 1
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .padding(end = 10.dp)
-                            .size(32.dp)
-                            .clickable { onToggleCheckboxAtLine(lineIdx) },
-                        contentAlignment = Alignment.Center
+                val match = checkboxRegex.find(line)
+                if (match != null) {
+                    val isChecked = match.value.startsWith("☑")
+                    val prefixLength = match.value.length
+                    val contentAnnotated = lineAnnotated.subSequence(
+                        prefixLength.coerceIn(0, lineAnnotated.length),
+                        lineAnnotated.length
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
+                        Box(
+                            modifier = Modifier
+                                .padding(end = 10.dp)
+                                .size(32.dp)
+                                .clickable { onToggleCheckboxAtLine(lineIdx) },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = if (isChecked) "☑" else "☐",
+                                color = Color.White,
+                                fontSize = 22.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                         Text(
-                            text = if (isChecked) "☑" else "☐",
+                            text = contentAnnotated,
                             color = Color.White,
-                            fontSize = 22.sp,
-                            fontWeight = FontWeight.Bold
+                            fontSize = 15.sp
                         )
                     }
+                } else {
                     Text(
-                        text = contentAnnotated,
+                        text = lineAnnotated.ifEmpty { AnnotatedString(" ") },
                         color = Color.White,
                         fontSize = 15.sp
                     )
                 }
-            } else {
-                Text(
-                    text = lineAnnotated.ifEmpty { AnnotatedString(" ") },
-                    color = Color.White,
-                    fontSize = 15.sp
-                )
             }
         }
     }
@@ -776,6 +918,14 @@ fun annotatedStringToJson(annotatedString: AnnotatedString): String {
         if (style.color != Color.Unspecified) {
             spanObj.put("color", String.format(java.util.Locale.US, "#%06X", (0xFFFFFF and style.color.toArgb())))
         }
+        if (style.fontSize != TextUnit.Unspecified) {
+            spanObj.put("fontSize", style.fontSize.value)
+        }
+        if (style.fontFamily == NdotFontFamily) {
+            spanObj.put("fontFamily", "ndot55")
+        } else if (style.fontFamily == FontFamily.Monospace) {
+            spanObj.put("fontFamily", "monospace")
+        }
         spansArr.put(spanObj)
     }
     obj.put("spans", spansArr)
@@ -800,6 +950,8 @@ fun jsonToAnnotatedString(jsonStr: String): AnnotatedString {
                 val isItalic = spanObj.optBoolean("italic", false)
                 val isUnderline = spanObj.optBoolean("underline", false)
                 val colorStr = spanObj.optString("color", "")
+                val fontSizeVal = spanObj.optDouble("fontSize", -1.0)
+                val fontFamilyStr = spanObj.optString("fontFamily", "")
 
                 if (start < end) {
                     var spanStyle = SpanStyle()
@@ -810,6 +962,15 @@ fun jsonToAnnotatedString(jsonStr: String): AnnotatedString {
                         try {
                             spanStyle = spanStyle.copy(color = Color(android.graphics.Color.parseColor(colorStr)))
                         } catch (e: Exception) {}
+                    }
+                    if (fontSizeVal >= 0) {
+                        spanStyle = spanStyle.copy(fontSize = fontSizeVal.toFloat().sp)
+                    }
+                    if (fontFamilyStr.isNotEmpty()) {
+                        when (fontFamilyStr) {
+                            "ndot55" -> spanStyle = spanStyle.copy(fontFamily = NdotFontFamily)
+                            "monospace" -> spanStyle = spanStyle.copy(fontFamily = FontFamily.Monospace)
+                        }
                     }
                     spans.add(AnnotatedString.Range(spanStyle, start, end))
                 }
@@ -857,6 +1018,10 @@ fun applyStyleToNotesString(
     val start = minOf(selectionStart, selectionEnd).coerceIn(0, text.length)
     val end = maxOf(selectionStart, selectionEnd).coerceIn(0, text.length)
     if (start >= end) return current
+
+    if (formatType == FormatType.FONT) {
+        return applyFontToAnnotatedString(current, selectionStart, selectionEnd, fontFamilyValue)
+    }
 
     val existingSpans = current.spanStyles.toMutableList()
 
@@ -964,7 +1129,7 @@ fun applyStyleToNotesString(
             FormatType.UNDERLINE -> baseStyle.copy(textDecoration = TextDecoration.Underline)
             FormatType.COLOR -> if (colorValue != Color.Unspecified) baseStyle.copy(color = colorValue) else baseStyle
             FormatType.SIZE -> baseStyle.copy(fontSize = (16 + sizeOffset).sp)
-            FormatType.FONT -> if (fontFamilyValue != null) baseStyle.copy(fontFamily = fontFamilyValue) else baseStyle
+            FormatType.FONT -> baseStyle.copy(fontFamily = fontFamilyValue)
             FormatType.CLEAR -> null
         }
         if (newStyle != null && hasAnyAttribute(newStyle)) {
@@ -1070,11 +1235,20 @@ fun NotesEditor(
     noteItem: ClipboardItem? = null,
     isCreatingNew: Boolean = noteItem == null,
     onBack: () -> Unit,
-    onNoteSaved: (() -> Unit)? = null
+    onNoteSaved: (() -> Unit)? = null,
+    onNoteSavedWithId: ((String) -> Unit)? = null
 ) {
     val context = LocalContext.current
     val keyboardController = LocalSoftwareKeyboardController.current
     val listState = rememberLazyListState()
+
+    val setOrientationLock = LocalOrientationLock.current
+    DisposableEffect(Unit) {
+        setOrientationLock(true)
+        onDispose {
+            setOrientationLock(false)
+        }
+    }
 
     var isEditingMode by remember { mutableStateOf(isCreatingNew) }
     var activeNoteBlocks by remember { mutableStateOf<List<NoteBlockItem>>(listOf(NoteBlockItem.TextBlock())) }
@@ -1093,8 +1267,25 @@ fun NotesEditor(
         }
     }
 
+    LaunchedEffect(activeNoteBlocks) {
+        if (!isCreatingNew && noteItem != null) {
+            val finalContent = buildContentFromBlocks(activeNoteBlocks)
+            if (finalContent.isNotBlank()) {
+                val updated = noteItem.copy(content = finalContent)
+                ClipboardHistoryManager.updateItem(context, updated)
+            }
+        }
+    }
+
+    val useDark = com.HojuNK.essent_all.LocalUseDark.current
+    val topBarBg = if (useDark) Color.Black else Color.White
+    val textColor = if (useDark) Color.White else Color.Black
+    val mutedColor = if (useDark) Color.Gray else Color.DarkGray
+    val cardBg = if (useDark) Color(0xFF1A1A1A) else Color(0xFFF0F0F0)
+    val borderColor = if (useDark) Color(0xFF333333) else Color.LightGray
+
     val yellowColor = Color(0xFFD700)
-    val grayBorder = Color(0xFF333333)
+    val grayBorder = borderColor
 
     var activeColor by remember { mutableStateOf<Color>(Color(0xFFFF3B30)) }
     var showColorPalette by remember { mutableStateOf(false) }
@@ -1119,16 +1310,17 @@ fun NotesEditor(
         if (finalContent.isNotBlank()) {
             if (noteItem != null) {
                 val updated = noteItem.copy(
-                    content = finalContent,
-                    timestamp = System.currentTimeMillis()
+                    content = finalContent
                 )
                 ClipboardHistoryManager.updateItem(context, updated)
+                onNoteSaved?.invoke()
             } else if (isCreatingNew) {
-                ClipboardHistoryManager.addItemAndGetId(context, finalContent, "text", isNote = true)
+                val newId = ClipboardHistoryManager.addItemAndGetId(context, finalContent, "text", isNote = true)
+                onNoteSavedWithId?.invoke(newId)
             }
             keyboardController?.hide()
             Toast.makeText(context, "Заметка сохранена", Toast.LENGTH_SHORT).show()
-            onNoteSaved?.invoke() ?: onBack()
+            isEditingMode = false
         }
     }
 
@@ -1183,7 +1375,7 @@ fun NotesEditor(
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
-        containerColor = Color.Black,
+        containerColor = topBarBg,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             TopAppBar(
@@ -1200,7 +1392,7 @@ fun NotesEditor(
                         val blurHeight = 45.dp.toPx()
                         drawRect(
                             brush = Brush.verticalGradient(
-                                colors = listOf(Color.Black, Color.Black.copy(alpha = 0.5f)),
+                                colors = listOf(topBarBg, topBarBg.copy(alpha = 0.5f)),
                                 startY = 0f,
                                 endY = size.height
                             ),
@@ -1208,7 +1400,7 @@ fun NotesEditor(
                         )
                         drawRect(
                             brush = Brush.verticalGradient(
-                                colors = listOf(Color.Black.copy(alpha = 0.5f), Color.Transparent),
+                                colors = listOf(topBarBg.copy(alpha = 0.5f), Color.Transparent),
                                 startY = size.height,
                                 endY = size.height + blurHeight
                             ),
@@ -1216,6 +1408,13 @@ fun NotesEditor(
                             size = Size(size.width, blurHeight)
                         )
                     },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = Color.Transparent,
+                    scrolledContainerColor = Color.Transparent,
+                    actionIconContentColor = textColor,
+                    navigationIconContentColor = textColor,
+                    titleContentColor = textColor
+                ),
                 navigationIcon = {
                     IconButton(onClick = {
                         if (zoomImagePath != null) {
@@ -1230,7 +1429,7 @@ fun NotesEditor(
                             onBack()
                         }
                     }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = textColor)
                     }
                 },
                 actions = {
@@ -1238,25 +1437,21 @@ fun NotesEditor(
                         IconButton(onClick = saveCurrentNote) {
                             Surface(
                                 shape = CircleShape,
-                                color = Color.White,
+                                color = textColor,
                                 modifier = Modifier.size(36.dp)
                             ) {
                                 Box(contentAlignment = Alignment.Center) {
                                     Icon(
                                         imageVector = Icons.Default.Check,
                                         contentDescription = "Save Note",
-                                        tint = Color.Black,
+                                        tint = cardBg,
                                         modifier = Modifier.size(22.dp)
                                     )
                                 }
                             }
                         }
                     }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.Transparent,
-                    scrolledContainerColor = Color.Transparent
-                )
+                }
             )
         },
         bottomBar = {
@@ -1270,7 +1465,7 @@ fun NotesEditor(
                         .navigationBarsPadding()
                         .imePadding()
                 ) {
-                    val activeTargetBlock = activeNoteBlocks.getOrNull(focusedBlockIndex.coerceIn(0, activeNoteBlocks.size - 1))
+                    val activeTargetBlock = activeNoteBlocks.getOrNull(getSafeTargetBlockIndex(focusedBlockIndex, activeNoteBlocks))
                     val activeTfv = (activeTargetBlock as? NoteBlockItem.TextBlock)?.textFieldValue ?: TextFieldValue("")
                     val isColorActive = remember(activeTfv) { isFormatActive(activeTfv, FormatType.COLOR) }
                     val isItalicActive = remember(activeTfv) { isFormatActive(activeTfv, FormatType.ITALIC) }
@@ -1313,7 +1508,22 @@ fun NotesEditor(
                                 palette = defaultColorPalette,
                                 activeColor = activeColor,
                                 onSelectColor = { paletteItem ->
-                                    if (paletteItem.isClose) {
+                                    if (paletteItem.isClear) {
+                                        pushUndoState()
+                                        val targetBlockIndex = focusedBlockIndex.coerceIn(0, activeNoteBlocks.size - 1)
+                                        val targetBlock = activeNoteBlocks.getOrNull(targetBlockIndex)
+                                        if (targetBlock is NoteBlockItem.TextBlock) {
+                                            val currentTfv = targetBlock.textFieldValue
+                                            val start = minOf(lastSelectedRange.start, lastSelectedRange.end).coerceIn(0, currentTfv.text.length)
+                                            val end = maxOf(lastSelectedRange.start, lastSelectedRange.end).coerceIn(0, currentTfv.text.length)
+                                            val effStart = if (start == end) 0 else start
+                                            val effEnd = if (start == end) currentTfv.text.length else end
+
+                                            val newAnnotated = applyStyleToNotesString(currentTfv.annotatedString, effStart, effEnd, FormatType.CLEAR, Color.Unspecified)
+                                            val mutable = activeNoteBlocks.toMutableList()
+                                            mutable[targetBlockIndex] = targetBlock.copy(textFieldValue = currentTfv.copy(annotatedString = newAnnotated))
+                                            activeNoteBlocks = mutable
+                                        }
                                         showColorPalette = false
                                     } else {
                                         pushUndoState()
@@ -1397,23 +1607,25 @@ fun NotesEditor(
                         if (showFontMenu) {
                             FontSelectionBar(
                                 activeFont = activeFontName,
-                                onSelectFont = { fontName ->
+                                onSelectFont = { fontItem ->
                                     pushUndoState()
-                                    activeFontName = fontName
-                                    val fontFamily = if (fontName == "ndot55") NdotFontFamily else null
-                                    val targetBlockIndex = focusedBlockIndex.coerceIn(0, activeNoteBlocks.size - 1)
-                                    val targetBlock = activeNoteBlocks.getOrNull(targetBlockIndex)
-                                    if (targetBlock is NoteBlockItem.TextBlock) {
-                                        val currentTfv = targetBlock.textFieldValue
-                                        val start = minOf(lastSelectedRange.start, lastSelectedRange.end).coerceIn(0, currentTfv.text.length)
-                                        val end = maxOf(lastSelectedRange.start, lastSelectedRange.end).coerceIn(0, currentTfv.text.length)
-                                        val effStart = if (start == end) 0 else start
-                                        val effEnd = if (start == end) currentTfv.text.length else end
+                                    activeFontName = fontItem.id
+                                    val fontFamily = fontItem.fontFamily
+                                    val targetBlockIndex = getSafeTargetBlockIndex(focusedBlockIndex, activeNoteBlocks)
+                                    if (targetBlockIndex >= 0) {
+                                        val targetBlock = activeNoteBlocks.getOrNull(targetBlockIndex)
+                                        if (targetBlock is NoteBlockItem.TextBlock) {
+                                            val currentTfv = targetBlock.textFieldValue
+                                            val start = minOf(lastSelectedRange.start, lastSelectedRange.end).coerceIn(0, currentTfv.text.length)
+                                            val end = maxOf(lastSelectedRange.start, lastSelectedRange.end).coerceIn(0, currentTfv.text.length)
+                                            val effStart = if (start == end) 0 else start
+                                            val effEnd = if (start == end) currentTfv.text.length else end
 
-                                        val newAnnotated = applyStyleToNotesString(currentTfv.annotatedString, effStart, effEnd, FormatType.FONT, fontFamilyValue = fontFamily)
-                                        val mutable = activeNoteBlocks.toMutableList()
-                                        mutable[targetBlockIndex] = targetBlock.copy(textFieldValue = currentTfv.copy(annotatedString = newAnnotated))
-                                        activeNoteBlocks = mutable
+                                            val newAnnotated = applyStyleToNotesString(currentTfv.annotatedString, effStart, effEnd, FormatType.FONT, fontFamilyValue = fontFamily)
+                                            val mutable = activeNoteBlocks.toMutableList()
+                                            mutable[targetBlockIndex] = targetBlock.copy(textFieldValue = currentTfv.copy(annotatedString = newAnnotated))
+                                            activeNoteBlocks = mutable
+                                        }
                                     }
                                     showFontMenu = false
                                 }
@@ -1797,7 +2009,7 @@ fun NotesEditor(
                                                     }
                                                     val updatedValue = TextFieldValue(
                                                         annotatedString = newAnnotatedString,
-                                                        selection = newValue.selection
+                                                        selection = if (structuredValue.text != block.textFieldValue.text) structuredValue.selection else newValue.selection
                                                     )
                                                     val mutable = activeNoteBlocks.toMutableList()
                                                     if (idx < mutable.size) {
@@ -1853,7 +2065,7 @@ fun NotesEditor(
                                                             activeNoteBlocks = mutable
                                                             val finalContent = buildContentFromBlocks(activeNoteBlocks)
                                                             if (noteItem != null) {
-                                                                val updated = noteItem.copy(content = finalContent, timestamp = System.currentTimeMillis())
+                                                                val updated = noteItem.copy(content = finalContent)
                                                                 ClipboardHistoryManager.updateItem(context, updated)
                                                             }
                                                         }

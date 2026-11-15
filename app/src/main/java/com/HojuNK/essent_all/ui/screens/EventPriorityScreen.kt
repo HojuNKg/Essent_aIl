@@ -90,17 +90,30 @@ fun EventPriorityScreen(
         tempEvents.filter { it.triggerGesture == selectedSlot }
     }
 
+    val useDark = com.HojuNK.essent_all.LocalUseDark.current
+    val topBarBg = if (useDark) Color.Black else Color.White
+    val textColor = if (useDark) Color.White else Color.Black
+    val mutedColor = if (useDark) Color.Gray else Color.DarkGray
+    val cardBg = if (useDark) Color.Black else Color.White
+    val innerCardBg = if (useDark) Color(0xFF1A1A1A) else Color(0xFFF0F0F0)
+    val borderColor = if (useDark) Color.Gray.copy(alpha = 0.3f) else Color.LightGray
+
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.event_priority_title), style = MaterialTheme.typography.titleLarge) },
                 navigationIcon = {
-                    IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) }
+                    IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = textColor) }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Black, titleContentColor = Color.White)
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = topBarBg,
+                    titleContentColor = textColor,
+                    navigationIconContentColor = textColor,
+                    actionIconContentColor = textColor
+                )
             )
         },
-        containerColor = Color.Black
+        containerColor = topBarBg
     ) { inner ->
         Box(modifier = Modifier.fillMaxSize().padding(inner)) {
             Column(modifier = Modifier.fillMaxSize()) {
@@ -113,16 +126,16 @@ fun EventPriorityScreen(
                 ) { page ->
                     Surface(
                         onClick = { scope.launch { pagerState.animateScrollToPage(page) } },
-                        color = Color(0xFF1A1A1A),
+                        color = innerCardBg,
                         shape = RoundedCornerShape(28.dp),
                         modifier = Modifier
                             .fillMaxSize()
-                            .border(2.dp, Color.Gray.copy(alpha = 0.3f), RoundedCornerShape(28.dp))
+                            .border(2.dp, borderColor, RoundedCornerShape(28.dp))
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             Text(
                                 text = stringResource(categories[page].titleRes),
-                                color = Color.White,
+                                color = textColor,
                                 style = MaterialTheme.typography.titleMedium
                             )
                         }
@@ -142,8 +155,8 @@ fun EventPriorityScreen(
                         Surface(
                             onClick = { selectedSlot = slot },
                             shape = RoundedCornerShape(20.dp),
-                            color = if (selected) Color.White else Color(0xFF2B2B2B),
-                            border = if (!selected) BorderStroke(1.dp, Color.Gray.copy(alpha = 0.2f)) else null,
+                            color = if (selected) textColor else innerCardBg,
+                            border = if (!selected) BorderStroke(1.dp, borderColor) else null,
                             modifier = Modifier.height(36.dp)
                         ) {
                             Row(
@@ -153,7 +166,7 @@ fun EventPriorityScreen(
                             ) {
                                 Text(
                                     text = stringResource(slot.getShortPressLabelRes()),
-                                    color = if (selected) Color.Black else Color.White,
+                                    color = if (selected) cardBg else textColor,
                                     style = MaterialTheme.typography.labelMedium,
                                     fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
                                 )
@@ -164,7 +177,7 @@ fun EventPriorityScreen(
 
                 Text(
                     stringResource(R.string.priority_drag_hint),
-                    color = Color.Gray,
+                    color = mutedColor,
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.padding(horizontal = 16.dp)
                 )
@@ -315,11 +328,17 @@ fun LazyItemScope.PriorityEventRow(
     val spacing = 8.dp
     val fullStepPx = with(density) { (itemHeight + spacing).toPx() }
 
+    val useDark = com.HojuNK.essent_all.LocalUseDark.current
+    val textColor = if (useDark) Color.White else Color.Black
+    val mutedColor = if (useDark) Color.Gray else Color.DarkGray
+    val innerCardBg = if (useDark) Color(0xFF1A1A1A) else Color(0xFFF0F0F0)
+    val borderColor = if (useDark) Color.Gray.copy(alpha = 0.2f) else Color.LightGray
+
     Surface(
-        color = Color(0xFF1A1A1A),
+        color = innerCardBg,
         shape = RoundedCornerShape(12.dp),
         tonalElevation = elevation,
-        border = BorderStroke(1.dp, Color.Gray.copy(alpha = 0.2f)),
+        border = BorderStroke(1.dp, borderColor),
         modifier = Modifier
             .fillMaxWidth()
             .height(itemHeight)
@@ -366,12 +385,12 @@ fun LazyItemScope.PriorityEventRow(
             modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text("${index + 1}.", color = Color.White, style = MaterialTheme.typography.labelLarge)
+            Text("${index + 1}.", color = textColor, style = MaterialTheme.typography.labelLarge)
             Spacer(Modifier.width(16.dp))
             EventIconDisplay(event.icon, displaySize = 32.dp)
             Spacer(Modifier.width(12.dp))
-            Text(event.title, color = Color.White, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge, maxLines = 1)
-            Icon(Icons.Default.DragHandle, null, tint = Color.Gray)
+            Text(event.title, color = textColor, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge, maxLines = 1)
+            Icon(Icons.Default.DragHandle, null, tint = mutedColor)
         }
     }
 }

@@ -212,8 +212,14 @@ fun RadialActionMenu(state: RadialMenuState, onDismiss: () -> Unit) {
                 animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy)
             )
 
-            val bgColor by animateColorAsState(if (isHovered) Color.White else Color(0xFF2A2A2A))
-            val iconColor by animateColorAsState(if (isHovered) Color.Black else Color.White)
+            val useDark = com.HojuNK.essent_all.LocalUseDark.current
+            val defaultBg = if (useDark) Color(0xFF2A2A2A) else Color(0xFFE0E0E0)
+            val hoverBg = if (useDark) Color.White else Color.Black
+            val defaultIcon = if (useDark) Color.White else Color.Black
+            val hoverIcon = if (useDark) Color.Black else Color.White
+
+            val bgColor by animateColorAsState(if (isHovered) hoverBg else defaultBg)
+            val iconColor by animateColorAsState(if (isHovered) hoverIcon else defaultIcon)
 
             Box(
                 modifier = Modifier
@@ -230,7 +236,7 @@ fun RadialActionMenu(state: RadialMenuState, onDismiss: () -> Unit) {
                         alpha = if (startAnim) 1f else 0f
                     }
                     .background(bgColor, CircleShape)
-                    .border(1.dp, if (isHovered) Color.White else Color.Gray.copy(alpha = 0.3f), CircleShape),
+                    .border(1.dp, if (isHovered) hoverBg else (if (useDark) Color.Gray.copy(alpha = 0.3f) else Color.LightGray), CircleShape),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(action.icon, null, tint = iconColor, modifier = Modifier.size(24.dp))

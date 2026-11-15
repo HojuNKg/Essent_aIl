@@ -2,6 +2,7 @@ package com.HojuNK.essent_all.ui.screens
 
 import android.content.Intent
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
@@ -77,12 +78,25 @@ fun MacrosScreen(
     onEditMacro: (Macro) -> Unit,
     onShowAccessibilityError: () -> Unit,
     isSelectionMode: Boolean = false,
-    onSelectionModeChange: (Boolean) -> Unit = {}
+    onSelectionModeChange: (Boolean) -> Unit = {},
+    onBack: (() -> Unit)? = null
 ) {
     val radialMenuState = LocalRadialMenuState.current
     val showRadialMenu = LocalRadialMenu.current
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
+
+    val useDark = when (keyMap.theme) {
+        AppTheme.AUTO -> isSystemInDarkTheme()
+        AppTheme.LIGHT -> false
+        AppTheme.DARK -> true
+    }
+    val topBarBg = if (useDark) Color.Black else Color.White
+    val textColor = if (useDark) Color.White else Color.Black
+    val mutedColor = if (useDark) Color.Gray else Color.DarkGray
+    val cardBg = if (useDark) Color.Black else Color.White
+    val innerCardBg = if (useDark) Color(0xFF1A1A1A) else Color(0xFFF0F0F0)
+    val borderColor = if (useDark) Color.Gray.copy(alpha = 0.3f) else Color.LightGray
     var fabPosition by remember { mutableStateOf(Offset.Zero) }
     var fabTopLeftInRoot by remember { mutableStateOf(Offset.Zero) }
     var fabSize by remember { mutableStateOf(IntSize.Zero) }
@@ -102,9 +116,15 @@ fun MacrosScreen(
     var selectedMacroIds by remember { mutableStateOf(setOf<String>()) }
     var showBatchDeleteConfirm by remember { mutableStateOf(false) }
 
-    BackHandler(enabled = localSelectionMode) {
-        updateSelectionMode(false)
-        selectedMacroIds = emptySet()
+    BackHandler(enabled = true) {
+        if (localSelectionMode) {
+            updateSelectionMode(false)
+            selectedMacroIds = emptySet()
+        } else if (onBack != null) {
+            onBack()
+        } else {
+            // Do nothing when in hotbar
+        }
     }
 
     val sortedMacros = remember(keyMap.macros, keyMap.macrosSortOption, keyMap.macrosSortAscending) {
@@ -144,18 +164,23 @@ fun MacrosScreen(
                     TopAppBar(
                         title = {
                             if (localSelectionMode) {
-                                Text(stringResource(R.string.selected_count, selectedMacroIds.size), color = Color.White, fontWeight = FontWeight.Bold)
+                                Text(stringResource(R.string.selected_count, selectedMacroIds.size), color = textColor, fontWeight = FontWeight.Bold)
                             } else {
                                 TypewriterTitle(targetText = stringResource(R.string.nav_macros), animate = false)
                             }
                         },
-                        colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
+                        colors = TopAppBarDefaults.topAppBarColors(
+                            containerColor = Color.Transparent,
+                            actionIconContentColor = textColor,
+                            navigationIconContentColor = textColor,
+                            titleContentColor = textColor
+                        ),
                         modifier = Modifier
                             .drawBehind {
                                 val blurHeight = 45.dp.toPx()
                                 drawRect(
                                     brush = Brush.verticalGradient(
-                                        colors = listOf(Color.Black, Color.Black.copy(alpha = 0.5f)),
+                                        colors = listOf(topBarBg, topBarBg.copy(alpha = 0.5f)),
                                         startY = 0f,
                                         endY = size.height
                                     ),
@@ -163,7 +188,7 @@ fun MacrosScreen(
                                 )
                                 drawRect(
                                     brush = Brush.verticalGradient(
-                                        colors = listOf(Color.Black.copy(alpha = 0.5f), Color.Transparent),
+                                        colors = listOf(topBarBg.copy(alpha = 0.5f), Color.Transparent),
                                         startY = size.height,
                                         endY = size.height + blurHeight
                                     ),
@@ -174,7 +199,11 @@ fun MacrosScreen(
                         navigationIcon = {
                             if (localSelectionMode) {
                                 IconButton(onClick = { updateSelectionMode(false); selectedMacroIds = emptySet() }) {
-                                    Icon(Icons.Default.Close, null, tint = Color.White)
+                                    Icon(Icons.Default.Close, null, tint = textColor)
+                                }
+                            } else if (onBack != null) {
+                                IconButton(onClick = onBack) {
+                                    Icon(Icons.Filled.ArrowBack, null, tint = textColor)
                                 }
                             }
                         },
@@ -184,11 +213,11 @@ fun MacrosScreen(
                                 IconButton(onClick = {
                                     selectedMacroIds = if (isAllSelected) emptySet() else filteredMacros.map { it.id }.toSet()
                                 }) {
-                                    Icon(if (isAllSelected) Icons.Default.Deselect else Icons.Default.SelectAll, null, tint = Color.White)
+                                    Icon(if (isAllSelected) Icons.Default.Deselect else Icons.Default.SelectAll, null, tint = textColor)
                                 }
                             } else {
                                 IconButton(onClick = { updateSelectionMode(true) }) {
-                                    Icon(Icons.Default.Checklist, null, tint = Color.White)
+                                    Icon(Icons.Default.Checklist, null, tint = textColor)
                                 }
                                 Box(
                                     modifier = Modifier
@@ -205,11 +234,11 @@ fun MacrosScreen(
                                     Icon(
                                         imageVector = if (keyMap.macrosViewMode == EventsViewMode.STRIPES) Icons.Default.ViewStream else Icons.Default.GridView,
                                         contentDescription = null,
-                                        tint = Color.White
+                                        tint = textColor
                                     )
                                 }
                                 IconButton(onClick = onOpenSettings) {
-                                    Icon(Icons.Default.Settings, null)
+                                    Icon(Icons.Default.Settings, null, tint = textColor)
                                 }
                             }
                         }
@@ -227,7 +256,7 @@ fun MacrosScreen(
 
                     Box(modifier = Modifier
                         .padding(
-                            bottom = if (isLandscape) 24.dp else 120.dp,
+                            bottom = if (isLandscape) 24.dp else (if (onBack != null) 24.dp else 120.dp),
                             start = if (isLandscape && rotation == ViewSurface.ROTATION_270) 135.dp else 0.dp,
                             end = if (isLandscape && rotation == ViewSurface.ROTATION_90) 135.dp else 0.dp
                         )
@@ -436,7 +465,7 @@ fun MacrosScreen(
                         start = 16.dp + startPadding, 
                         end = 16.dp + endPadding, 
                         top = topPadding + 16.dp, 
-                        bottom = inner.calculateBottomPadding() + 16.dp + (if (isLandscape) 0.dp else 120.dp)
+                        bottom = inner.calculateBottomPadding() + 16.dp + (if (isLandscape) 0.dp else (if (onBack != null) 24.dp else 120.dp))
                     ),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -465,8 +494,8 @@ fun MacrosScreen(
                                         }
                                     },
                                     shape = RoundedCornerShape(20.dp),
-                                    color = if (isSelected) Color.White else Color(0xFF2B2B2B),
-                                    border = if (!isSelected) BorderStroke(1.dp, Color.Gray.copy(alpha = 0.2f)) else null,
+                                    color = if (isSelected) textColor else innerCardBg,
+                                    border = if (!isSelected) BorderStroke(1.dp, borderColor) else null,
                                     modifier = Modifier.height(36.dp)
                                 ) {
                                     Row(
@@ -475,11 +504,11 @@ fun MacrosScreen(
                                         horizontalArrangement = Arrangement.Center
                                     ) {
                                         if (showCross) {
-                                            Icon(Icons.Default.Close, contentDescription = null, tint = Color.Gray, modifier = Modifier.size(16.dp))
+                                            Icon(Icons.Default.Close, contentDescription = null, tint = mutedColor, modifier = Modifier.size(16.dp))
                                         } else {
                                             Text(
                                                 text = stringResource(filter.labelRes),
-                                                color = if (isSelected) Color.Black else Color.White,
+                                                color = if (isSelected) cardBg else textColor,
                                                 style = MaterialTheme.typography.labelMedium,
                                                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
                                             )
@@ -644,6 +673,10 @@ fun MacroSelectionBottomPanel(
     onDelete: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val useDark = com.HojuNK.essent_all.LocalUseDark.current
+    val innerCardBg = if (useDark) Color(0xFF1A1A1A) else Color(0xFFF0F0F0)
+    val borderColor = if (useDark) Color.Gray.copy(alpha = 0.3f) else Color.LightGray
+
     var panelWidth by remember { mutableStateOf(0f) }
     val rotatedModifier = when {
         isLandscape && rotation == ViewSurface.ROTATION_90 ->
@@ -668,9 +701,9 @@ fun MacroSelectionBottomPanel(
     }
 
     Surface(
-        color = Color(0xFF2B2B2B),
+        color = innerCardBg,
         shape = RoundedCornerShape(50.dp),
-        border = BorderStroke(1.dp, Color.Black),
+        border = BorderStroke(1.dp, borderColor),
         modifier = rotatedModifier
             .width(300.dp)
             .height(68.dp)

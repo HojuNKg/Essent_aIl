@@ -857,3 +857,133 @@ fun QuickActionPopup(x: androidx.compose.ui.unit.Dp, onEdit: () -> Unit, onDelet
         }
     }
 }
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+fun SwipeableBlockItem(
+    isEditing: Boolean,
+    onDelete: () -> Unit,
+    onMoveUp: (() -> Unit)?,
+    onMoveDown: (() -> Unit)?,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit
+) {
+    if (!isEditing) {
+        Box(modifier = modifier) { content() }
+        return
+    }
+
+    val density = LocalDensity.current
+    var offsetX by remember { mutableStateOf(0f) }
+    var showActionPanel by remember { mutableStateOf(false) }
+    var isDeleting by remember { mutableStateOf(false) }
+
+    val animatedOffsetX by animateFloatAsState(
+        targetValue = when {
+            isDeleting -> 1000f
+            showActionPanel -> -140f
+            else -> 0f
+        },
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium)
+    )
+    val alphaAnim by animateFloatAsState(
+        targetValue = if (isDeleting) 0f else 1f,
+        animationSpec = tween(200)
+    )
+
+    val actionPanelWidthPx = with(density) { 140.dp.toPx() }
+    val deleteThresholdPx = with(density) { 100.dp.toPx() }
+    val swipeLeftThresholdPx = with(density) { -60.dp.toPx() }
+
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .graphicsLayer(
+                translationX = if (isDeleting) animatedOffsetX else (offsetX + animatedOffsetX).coerceIn(-actionPanelWidthPx, 1000f),
+                alpha = alphaAnim
+            )
+            .pointerInput(isEditing) {
+                if (!isEditing) return@pointerInput
+                detectHorizontalDragGestures(
+                    onDragStart = { },
+                    onDragEnd = {
+                        if (offsetX > deleteThresholdPx) {
+                            isDeleting = true
+                        } else if (offsetX < swipeLeftThresholdPx) {
+                            showActionPanel = true
+                            offsetX = 0f
+                        } else {
+                            offsetX = 0f
+                        }
+                    },
+                    onDragCancel = {
+                        offsetX = 0f
+                    },
+                    onHorizontalDrag = { change, dragAmount ->
+                        change.consume()
+                        offsetX += dragAmount
+                    }
+                )
+            }
+    ) {
+        Box(modifier = Modifier.fillMaxWidth()) {
+            content()
+        }
+
+        if (showActionPanel || animatedOffsetX < -10f) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .width(140.dp)
+                    .fillMaxHeight()
+                    .padding(start = 8.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color(0xFF222222), RoundedCornerShape(16.dp))
+                        .border(1.dp, Color(0xFF444444), RoundedCornerShape(16.dp))
+                        .padding(horizontal = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (onMoveUp != null) {
+                        IconButton(onClick = {
+                            showActionPanel = false
+                            onMoveUp()
+                        }) {
+                            Icon(Icons.Default.KeyboardArrowUp, contentDescription = "Move Up", tint = Color.White)
+                        }
+                    } else {
+                        Spacer(modifier = Modifier.size(36.dp))
+                    }
+
+                    IconButton(onClick = {
+                        isDeleting = true
+                    }) {
+                        Icon(Icons.Default.Delete, contentDescription = "Delete", tint = Color(0xFFFF5555))
+                    }
+
+                    if (onMoveDown != null) {
+                        IconButton(onClick = {
+                            showActionPanel = false
+                            onMoveDown()
+                        }) {
+                            Icon(Icons.Default.KeyboardArrowDown, contentDescription = "Move Down", tint = Color.White)
+                        }
+                    } else {
+                        Spacer(modifier = Modifier.size(36.dp))
+                    }
+                }
+            }
+        }
+    }
+
+    LaunchedEffect(isDeleting) {
+        if (isDeleting) {
+            kotlinx.coroutines.delay(220)
+            onDelete()
+        }
+    }
+}

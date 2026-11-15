@@ -88,6 +88,12 @@ fun StripeMacroItem(
 
     val isActive = radialMenuState != null && radialMenuState.sourceId == macro.id
 
+    val useDark = com.HojuNK.essent_all.LocalUseDark.current
+    val itemBg = if (macro.isEnabled) (if (useDark) Color(0xFF2B2B2B) else Color(0xFFF0F0F0)) else (if (useDark) Color(0xFF101010) else Color(0xFFE4E4E4))
+    val textColor = if (macro.isEnabled) (if (useDark) Color.White else Color.Black) else (if (useDark) Color.Gray else Color(0xFF777777))
+    val mutedColor = if (useDark) Color.Gray else Color(0xFF666666)
+    val borderColor = if (useDark) Color.Gray.copy(alpha = 0.15f) else Color.LightGray
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -98,26 +104,26 @@ fun StripeMacroItem(
                 itemOffsetInRoot = it.positionInRoot()
                 itemSize = it.size
             }
-            .background(if (isDeletingAnimating) Color.Red else Color(0xFF1A1A1A))
+            .background(if (isDeletingAnimating) Color.Red else (if (useDark) Color(0xFF1A1A1A) else Color(0xFFF0F0F0)))
     ) {
         val itemContent = @Composable {
             Surface(
                 shape = RoundedCornerShape(24.dp),
-                color = if (macro.isEnabled) Color(0xFF2B2B2B) else Color(0xFF101010),
+                color = itemBg,
                 tonalElevation = if (macro.isEnabled) 2.dp else 0.dp,
-                border = if (isSelected) BorderStroke(2.dp, Color.White) else if (!macro.isEnabled) BorderStroke(1.dp, Color.Gray.copy(alpha = 0.15f)) else null,
+                border = if (isSelected) BorderStroke(2.dp, if (useDark) Color.White else Color.Black) else if (!macro.isEnabled) BorderStroke(1.dp, borderColor) else null,
                 modifier = Modifier.fillMaxSize()
             ) {
                 Row(modifier = Modifier.padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
                     EventIconDisplay(macro.icon, displaySize = 42.dp, grayscale = !macro.isEnabled)
                     Spacer(Modifier.width(16.dp))
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(macro.title, style = MaterialTheme.typography.bodyLarge, color = if (macro.isEnabled) Color.White else Color.Gray)
+                        Text(macro.title, style = MaterialTheme.typography.bodyLarge, color = textColor)
                         if (macro.actions.isNotEmpty()) {
                             Text(
                                 text = "${macro.actions.size} шагов",
                                 style = MaterialTheme.typography.labelSmall,
-                                color = Color.Gray
+                                color = mutedColor
                             )
                         }
                     }
@@ -297,13 +303,19 @@ fun RectangleMacroItem(
 
     val isActive = radialMenuState != null && radialMenuState.sourceId == macro.id
 
+    val useDark = com.HojuNK.essent_all.LocalUseDark.current
+    val itemBg = if (macro.isEnabled) (if (useDark) Color(0xFF2B2B2B) else Color(0xFFF0F0F0)) else (if (useDark) Color(0xFF101010) else Color(0xFFE4E4E4))
+    val textColor = if (macro.isEnabled) (if (useDark) Color.White else Color.Black) else (if (useDark) Color.Gray else Color(0xFF777777))
+    val mutedColor = if (useDark) Color.Gray else Color(0xFF666666)
+    val borderColor = if (useDark) Color.Gray.copy(alpha = 0.15f) else Color.LightGray
+
     Box(modifier = Modifier.graphicsLayer { alpha = if (isActive) 0f else 1f }) {
         val itemContent = @Composable {
             Surface(
                 shape = RoundedCornerShape(24.dp),
-                color = if (macro.isEnabled) Color(0xFF2B2B2B) else Color(0xFF101010),
+                color = itemBg,
                 tonalElevation = if (macro.isEnabled) 2.dp else 0.dp,
-                border = if (isSelected) BorderStroke(2.dp, Color.White) else if (!macro.isEnabled) BorderStroke(1.dp, Color.Gray.copy(alpha = 0.15f)) else null,
+                border = if (isSelected) BorderStroke(2.dp, if (useDark) Color.White else Color.Black) else if (!macro.isEnabled) BorderStroke(1.dp, borderColor) else null,
                 modifier = Modifier.fillMaxSize()
             ) {
                 Column(
@@ -329,7 +341,7 @@ fun RectangleMacroItem(
                     Text(
                         macro.title,
                         style = MaterialTheme.typography.titleMedium.copy(lineHeight = 24.sp),
-                        color = if (macro.isEnabled) Color.White else Color.Gray,
+                        color = textColor,
                         textAlign = TextAlign.Center,
                         fontWeight = FontWeight.Bold
                     )
@@ -337,7 +349,7 @@ fun RectangleMacroItem(
                         Text(
                             text = "${macro.actions.size} шагов",
                             style = MaterialTheme.typography.labelSmall,
-                            color = Color.Gray
+                            color = mutedColor
                         )
                     }
                 }
