@@ -53,6 +53,10 @@ fun EventAddPanel(
     onDismiss: () -> Unit,
     onSave: (EventRule) -> Unit
 ) {
+    BackHandler(enabled = true) {
+        onDismiss()
+    }
+
     var currentRule by rememberSaveable { mutableStateOf(initialRule) }
     var showIconPicker by remember { mutableStateOf(false) }
     val ctx = LocalContext.current

@@ -1,6 +1,7 @@
 package com.HojuNK.essent_all.ui.screens
 
 import android.content.Context
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -39,6 +40,10 @@ fun ButtonActionsScreen(
     predictiveBackProgress: Float = 0f,
     onBack: () -> Unit
 ) {
+    BackHandler(enabled = true) {
+        onBack()
+    }
+
     var selectedSlot by remember { mutableStateOf(slots.firstOrNull() ?: TapSlot.SINGLE) }
     var picker by remember { mutableStateOf<TapSlot?>(null) }
     var showAssistantPermissionDialog by remember { mutableStateOf(false) }

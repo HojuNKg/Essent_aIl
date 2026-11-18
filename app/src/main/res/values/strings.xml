@@ -446,6 +446,7 @@
     <string name="action_set_a_timer_title">Установка таймера</string>
     <string name="action_recent_apps_title">Недавние приложения</string>
     <string name="action_read_screen_title">Чтение экрана</string>
+    <string name="action_search_screen_title">Поиск по экрану</string>
     <string name="action_read_aloud_title">Чтение вслух</string>
     <string name="action_copy_title">Копировать</string>
     <string name="action_paste_title">Вставить</string>
@@ -473,4 +474,5 @@
     <string name="menu_paste">Вставить</string>
     <string name="menu_favorite">Избранное</string>
     <string name="menu_delete">Удалить</string>
+    <string name="action_test_clipboard_title">Тест буфера обмена</string>
 </resources>

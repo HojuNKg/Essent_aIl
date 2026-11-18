@@ -73,10 +73,11 @@ fun ConfigScreen(
     apps: List<AppInfo>?,
     onOpenSettings: () -> Unit,
     onActionPickerStateChange: ((Boolean) -> Unit)? = null,
-    onOpenBlockDetail: (String, List<TapSlot>) -> Unit
+    onOpenBlockDetail: (String, List<TapSlot>) -> Unit,
+    onBack: (() -> Unit)? = null
 ) {
     BackHandler(enabled = true) {
-        // Do nothing on Key screen
+        onBack?.invoke()
     }
 
     val useDark = when (keyMap.theme) {

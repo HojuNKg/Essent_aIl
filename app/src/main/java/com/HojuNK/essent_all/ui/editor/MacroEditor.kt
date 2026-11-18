@@ -71,6 +71,10 @@ fun MacroAddPanel(
     onDismiss: () -> Unit,
     onSave: (Macro) -> Unit
 ) {
+    BackHandler(enabled = true) {
+        onDismiss()
+    }
+
     var currentMacro by rememberSaveable { mutableStateOf(initialMacro) }
     var undoStack by remember { mutableStateOf(listOf<Macro>()) }
     var redoStack by remember { mutableStateOf(listOf<Macro>()) }

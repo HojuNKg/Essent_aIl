@@ -71,6 +71,10 @@ fun GlyphAddPanel(
     onDismiss: () -> Unit,
     onSave: (Macro) -> Unit
 ) {
+    BackHandler(enabled = true) {
+        onDismiss()
+    }
+
     var currentPattern by rememberSaveable { mutableStateOf(initialPattern) }
     var undoStack by remember { mutableStateOf(listOf<Macro>()) }
     var redoStack by remember { mutableStateOf(listOf<Macro>()) }

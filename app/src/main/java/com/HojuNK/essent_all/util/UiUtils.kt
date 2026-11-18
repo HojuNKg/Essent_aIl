@@ -268,6 +268,11 @@ fun slotDisplay(ctx: Context, value: String?, events: List<EventRule>, macros: L
         "${ctx.getString(R.string.action_auto_brightness)} ($data)"
     }
     value == Config.ACTION_SCREENSHOT -> ctx.getString(R.string.action_screenshot)
+    value == Config.ACTION_READ_SCREEN -> ctx.getString(R.string.action_read_screen_title)
+    value == Config.ACTION_SEARCH_SCREEN -> ctx.getString(R.string.action_search_screen_title)
+    value == Config.ACTION_READ_ALOUD -> ctx.getString(R.string.action_read_aloud_title)
+    value == Config.ACTION_COPY -> ctx.getString(R.string.action_copy_title)
+    value == Config.ACTION_PASTE -> ctx.getString(R.string.action_paste_title)
     value == Config.ACTION_LOCK_SCREEN -> ctx.getString(R.string.action_lock_screen)
     value == Config.ACTION_SPLIT_SCREEN -> ctx.getString(R.string.action_split_screen)
     value == Config.ACTION_DND_TOGGLE -> ctx.getString(R.string.control_dnd)

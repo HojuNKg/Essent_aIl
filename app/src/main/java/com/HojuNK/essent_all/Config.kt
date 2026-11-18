@@ -344,6 +344,7 @@ object Config {
     const val ACTION_WIFI_TOGGLE = "action:system:wifi_toggle"
     const val ACTION_RECENTS = "action:system:recents"
     const val ACTION_READ_SCREEN = "action:system:read_screen"
+    const val ACTION_SEARCH_SCREEN = "action:system:search_screen"
     const val ACTION_READ_ALOUD = "action:system:read_aloud"
     const val ACTION_COPY = "action:system:copy"
     const val ACTION_PASTE = "action:system:paste"

@@ -2,6 +2,7 @@ package com.HojuNK.essent_all
 
 import android.content.Context
 import android.content.pm.PackageManager
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
@@ -122,6 +123,10 @@ fun ControlPanelContent(
     onControlClick: (ControlItem) -> Boolean, // Returns true if should dismiss
     onDismiss: () -> Unit
 ) {
+    BackHandler(enabled = true) {
+        onDismiss()
+    }
+
     var items by remember(initialItems) { mutableStateOf(initialItems) }
     var selectedItem by remember { mutableStateOf<ControlItem?>(null) }
     var showAddMenu by remember { mutableStateOf<Pair<Int, Int>?>(null) }

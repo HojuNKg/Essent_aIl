@@ -8,14 +8,18 @@ import androidx.compose.animation.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridItemSpan
 import androidx.compose.foundation.lazy.staggeredgrid.items
+import androidx.compose.foundation.lazy.staggeredgrid.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -29,12 +33,16 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.unit.toSize
 import com.HojuNK.essent_all.AppInfo
 import com.HojuNK.essent_all.ClipboardHistoryManager
 import com.HojuNK.essent_all.ClipboardItem
@@ -159,8 +167,22 @@ fun NotesScreen(
     var selectedItemIds by remember { mutableStateOf(setOf<String>()) }
     var expandedMenuId by remember { mutableStateOf<String?>(null) }
 
+    val itemPositions = remember { mutableStateMapOf<Int, androidx.compose.ui.geometry.Rect>() }
+    var dragStartIndex by remember { mutableStateOf<Int?>(null) }
+    var initialSelectionBeforeDrag by remember { mutableStateOf(setOf<String>()) }
+    var dragTargetState by remember { mutableStateOf<Boolean?>(null) }
+
+    var localSelectionMode by remember { mutableStateOf(isSelectionMode) }
     LaunchedEffect(isSelectionMode) {
-        if (!isSelectionMode) {
+        localSelectionMode = isSelectionMode
+    }
+    val updateSelectionMode: (Boolean) -> Unit = { active ->
+        localSelectionMode = active
+        onSelectionModeChange(active)
+    }
+
+    LaunchedEffect(localSelectionMode) {
+        if (!localSelectionMode) {
             selectedItemIds = emptySet()
         }
     }
@@ -258,16 +280,18 @@ fun NotesScreen(
         return
     }
 
-    BackHandler(enabled = true) {
-        if (isSelectionMode) {
-            onSelectionModeChange(false)
-            selectedItemIds = emptySet()
-        } else if (isSearchActive) {
-            onSearchActiveChange(false)
-            searchQuery = ""
-        } else if (onBack != null) {
-            onBack()
-        }
+    BackHandler(enabled = localSelectionMode) {
+        updateSelectionMode(false)
+        selectedItemIds = emptySet()
+    }
+
+    BackHandler(enabled = isSearchActive && !localSelectionMode) {
+        onSearchActiveChange(false)
+        searchQuery = ""
+    }
+
+    BackHandler(enabled = !localSelectionMode && !isSearchActive && onBack != null) {
+        onBack?.invoke()
     }
 
     val useDark = com.HojuNK.essent_all.LocalUseDark.current
@@ -341,7 +365,7 @@ fun NotesScreen(
             if (configuration.orientation == android.content.res.Configuration.ORIENTATION_PORTRAIT) {
                 TopAppBar(
                     title = {
-                        if (isSelectionMode) {
+                        if (localSelectionMode) {
                             Text(stringResource(R.string.selected_count, selectedItemIds.size), color = textColor, fontWeight = FontWeight.Bold)
                         } else if (isSearchActive) {
                             OutlinedTextField(
@@ -362,7 +386,10 @@ fun NotesScreen(
                                 shape = RoundedCornerShape(14.dp)
                             )
                         } else {
-                            TypewriterTitle(targetText = "Заметки", animate = false)
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                TypewriterTitle(targetText = "Заметки", animate = false)
+                                Text(" (бета)", color = Color.Gray, fontWeight = FontWeight.Light, fontSize = 20.sp)
+                            }
                         }
                     },
                     modifier = Modifier
@@ -387,8 +414,8 @@ fun NotesScreen(
                             )
                         },
                     navigationIcon = {
-                        if (isSelectionMode) {
-                            IconButton(onClick = { onSelectionModeChange(false); selectedItemIds = emptySet() }) {
+                        if (localSelectionMode) {
+                            IconButton(onClick = { updateSelectionMode(false); selectedItemIds = emptySet() }) {
                                 Icon(Icons.Default.Close, null, tint = textColor)
                             }
                         } else if (isSearchActive) {
@@ -402,7 +429,7 @@ fun NotesScreen(
                         }
                     },
                     actions = {
-                        if (isSelectionMode) {
+                        if (localSelectionMode) {
                             val isAllSelected = filteredItems.isNotEmpty() && filteredItems.all { selectedItemIds.contains(it.id) }
                             IconButton(onClick = {
                                 selectedItemIds = if (isAllSelected) emptySet() else filteredItems.map { it.id }.toSet()
@@ -411,7 +438,7 @@ fun NotesScreen(
                             }
                         } else {
                             if (!isSearchActive) {
-                                IconButton(onClick = { onSelectionModeChange(true) }) {
+                                IconButton(onClick = { updateSelectionMode(true) }) {
                                     Icon(Icons.Default.Checklist, null, tint = textColor)
                                 }
                                 Box(
@@ -455,7 +482,7 @@ fun NotesScreen(
         },
         floatingActionButtonPosition = if (isLandscape && rotation == ViewSurface.ROTATION_270) FabPosition.Start else FabPosition.End,
         floatingActionButton = {
-            if (!isSelectionMode && !isSearchActive) {
+            if (!localSelectionMode && !isSearchActive) {
                 FloatingActionButton(
                     onClick = {
                         isCreatingNewItem = true
@@ -493,7 +520,54 @@ fun NotesScreen(
         val bottomPadding = paddingValues.calculateBottomPadding()
 
         Box(
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier
+                .fillMaxSize()
+                .pointerInput(localSelectionMode, filteredItems) {
+                    if (localSelectionMode) {
+                        awaitEachGesture {
+                            val down = awaitFirstDown(requireUnconsumed = false)
+                            val startPos = down.position
+                            val startIndex = filteredItems.indices.find { i ->
+                                itemPositions[i]?.contains(startPos) == true
+                            }
+                            if (startIndex != null) {
+                                dragStartIndex = startIndex
+                                initialSelectionBeforeDrag = selectedItemIds
+                                dragTargetState = !selectedItemIds.contains(filteredItems[startIndex].id)
+                                selectedItemIds = if (dragTargetState == true) selectedItemIds + filteredItems[startIndex].id else selectedItemIds - filteredItems[startIndex].id
+
+                                try {
+                                    while (true) {
+                                        val event = awaitPointerEvent()
+                                        val change = event.changes.firstOrNull()
+                                        if (change != null) {
+                                            val currPos = change.position
+                                            val currentIndex = filteredItems.indices.find { i ->
+                                                itemPositions[i]?.contains(currPos) == true
+                                            }
+                                            if (currentIndex != null && dragStartIndex != null && dragTargetState != null) {
+                                                val range = minOf(dragStartIndex!!, currentIndex)..maxOf(dragStartIndex!!, currentIndex)
+                                                val newSel = mutableSetOf<String>().apply { addAll(initialSelectionBeforeDrag) }
+                                                filteredItems.forEachIndexed { i, item ->
+                                                    if (i in range) {
+                                                        if (dragTargetState == true) newSel.add(item.id) else newSel.remove(item.id)
+                                                    } else {
+                                                        if (initialSelectionBeforeDrag.contains(item.id)) newSel.add(item.id) else newSel.remove(item.id)
+                                                    }
+                                                }
+                                                selectedItemIds = newSel
+                                            }
+                                        }
+                                        if (event.changes.all { !it.pressed }) break
+                                    }
+                                } finally {
+                                    dragStartIndex = null
+                                    dragTargetState = null
+                                }
+                            }
+                        }
+                    }
+                }
         ) {
             Column(modifier = Modifier.fillMaxSize()) {
                 if (isSearchActive && isLandscape) {
@@ -554,48 +628,60 @@ fun NotesScreen(
                                 }
                             }
                         } else {
-                            items(filteredItems, key = { it.id }) { item ->
+                            itemsIndexed(filteredItems, key = { _, item -> item.id }) { index, item ->
                                 val isSelected = selectedItemIds.contains(item.id)
-                                ClipboardCard(
-                                    item = item,
-                                    isMenuExpanded = expandedMenuId == item.id,
-                                    isNoteStyle = true,
-                                    maxLines = 5,
-                                    onToggleMenu = {
-                                        if (isSelectionMode) {
-                                            selectedItemIds = if (isSelected) selectedItemIds - item.id else selectedItemIds + item.id
-                                        } else {
-                                            expandedMenuId = if (expandedMenuId == item.id) null else item.id
-                                        }
-                                    },
-                                    onTap = {
-                                        if (isSelectionMode) {
-                                            selectedItemIds = if (isSelected) selectedItemIds - item.id else selectedItemIds + item.id
-                                        } else {
-                                            selectedDetailItem = item
-                                        }
-                                    },
-                                    onCopy = {
-                                        ClipboardHistoryManager.copyToClipboard(context, item)
-                                        Toast.makeText(context, R.string.copied_to_clipboard, Toast.LENGTH_SHORT).show()
-                                        expandedMenuId = null
-                                    },
-                                    onPaste = {
-                                        ClipboardHistoryManager.copyToClipboard(context, item)
-                                        Toast.makeText(context, R.string.copied_to_clipboard, Toast.LENGTH_SHORT).show()
-                                        expandedMenuId = null
-                                    },
-                                    onDelete = {
-                                        ClipboardHistoryManager.removeItem(context, item.id)
-                                        history = ClipboardHistoryManager.getHistory(context)
-                                        expandedMenuId = null
-                                    },
-                                    onPin = {
-                                        ClipboardHistoryManager.togglePin(context, item.id)
-                                        history = ClipboardHistoryManager.getHistory(context)
-                                        expandedMenuId = null
+                                val onSelectToggle = {
+                                    selectedItemIds = if (isSelected) selectedItemIds - item.id else selectedItemIds + item.id
+                                }
+                                Box(
+                                    modifier = Modifier.onGloballyPositioned { coords ->
+                                        itemPositions[index] = androidx.compose.ui.geometry.Rect(coords.positionInRoot(), coords.size.toSize())
                                     }
-                                )
+                                ) {
+                                    ClipboardCard(
+                                        item = item,
+                                        isMenuExpanded = expandedMenuId == item.id,
+                                        isNoteStyle = true,
+                                        maxLines = 5,
+                                        isSelectionMode = localSelectionMode,
+                                        isSelected = isSelected,
+                                        onSelectToggle = onSelectToggle,
+                                        onToggleMenu = {
+                                            if (localSelectionMode) {
+                                                onSelectToggle()
+                                            } else {
+                                                expandedMenuId = if (expandedMenuId == item.id) null else item.id
+                                            }
+                                        },
+                                        onTap = {
+                                            if (localSelectionMode) {
+                                                onSelectToggle()
+                                            } else {
+                                                selectedDetailItem = item
+                                            }
+                                        },
+                                        onCopy = {
+                                            ClipboardHistoryManager.copyToClipboard(context, item)
+                                            Toast.makeText(context, R.string.copied_to_clipboard, Toast.LENGTH_SHORT).show()
+                                            expandedMenuId = null
+                                        },
+                                        onPaste = {
+                                            ClipboardHistoryManager.copyToClipboard(context, item)
+                                            Toast.makeText(context, R.string.copied_to_clipboard, Toast.LENGTH_SHORT).show()
+                                            expandedMenuId = null
+                                        },
+                                        onDelete = {
+                                            ClipboardHistoryManager.removeItem(context, item.id)
+                                            history = ClipboardHistoryManager.getHistory(context)
+                                            expandedMenuId = null
+                                        },
+                                        onPin = {
+                                            ClipboardHistoryManager.togglePin(context, item.id)
+                                            history = ClipboardHistoryManager.getHistory(context)
+                                            expandedMenuId = null
+                                        }
+                                    )
+                                }
                             }
                         }
                     }
@@ -633,48 +719,60 @@ fun NotesScreen(
                                 }
                             }
                         } else {
-                            items(filteredItems, key = { it.id }) { item ->
+                            itemsIndexed(filteredItems, key = { _, item -> item.id }) { index, item ->
                                 val isSelected = selectedItemIds.contains(item.id)
-                                ClipboardCard(
-                                    item = item,
-                                    isMenuExpanded = expandedMenuId == item.id,
-                                    isNoteStyle = true,
-                                    maxLines = 7,
-                                    onToggleMenu = {
-                                        if (isSelectionMode) {
-                                            selectedItemIds = if (isSelected) selectedItemIds - item.id else selectedItemIds + item.id
-                                        } else {
-                                            expandedMenuId = if (expandedMenuId == item.id) null else item.id
-                                        }
-                                    },
-                                    onTap = {
-                                        if (isSelectionMode) {
-                                            selectedItemIds = if (isSelected) selectedItemIds - item.id else selectedItemIds + item.id
-                                        } else {
-                                            selectedDetailItem = item
-                                        }
-                                    },
-                                    onCopy = {
-                                        ClipboardHistoryManager.copyToClipboard(context, item)
-                                        Toast.makeText(context, R.string.copied_to_clipboard, Toast.LENGTH_SHORT).show()
-                                        expandedMenuId = null
-                                    },
-                                    onPaste = {
-                                        ClipboardHistoryManager.copyToClipboard(context, item)
-                                        Toast.makeText(context, R.string.copied_to_clipboard, Toast.LENGTH_SHORT).show()
-                                        expandedMenuId = null
-                                    },
-                                    onDelete = {
-                                        ClipboardHistoryManager.removeItem(context, item.id)
-                                        history = ClipboardHistoryManager.getHistory(context)
-                                        expandedMenuId = null
-                                    },
-                                    onPin = {
-                                        ClipboardHistoryManager.togglePin(context, item.id)
-                                        history = ClipboardHistoryManager.getHistory(context)
-                                        expandedMenuId = null
+                                val onSelectToggle = {
+                                    selectedItemIds = if (isSelected) selectedItemIds - item.id else selectedItemIds + item.id
+                                }
+                                Box(
+                                    modifier = Modifier.onGloballyPositioned { coords ->
+                                        itemPositions[index] = androidx.compose.ui.geometry.Rect(coords.positionInRoot(), coords.size.toSize())
                                     }
-                                )
+                                ) {
+                                    ClipboardCard(
+                                        item = item,
+                                        isMenuExpanded = expandedMenuId == item.id,
+                                        isNoteStyle = true,
+                                        maxLines = 7,
+                                        isSelectionMode = localSelectionMode,
+                                        isSelected = isSelected,
+                                        onSelectToggle = onSelectToggle,
+                                        onToggleMenu = {
+                                            if (localSelectionMode) {
+                                                onSelectToggle()
+                                            } else {
+                                                expandedMenuId = if (expandedMenuId == item.id) null else item.id
+                                            }
+                                        },
+                                        onTap = {
+                                            if (localSelectionMode) {
+                                                onSelectToggle()
+                                            } else {
+                                                selectedDetailItem = item
+                                            }
+                                        },
+                                        onCopy = {
+                                            ClipboardHistoryManager.copyToClipboard(context, item)
+                                            Toast.makeText(context, R.string.copied_to_clipboard, Toast.LENGTH_SHORT).show()
+                                            expandedMenuId = null
+                                        },
+                                        onPaste = {
+                                            ClipboardHistoryManager.copyToClipboard(context, item)
+                                            Toast.makeText(context, R.string.copied_to_clipboard, Toast.LENGTH_SHORT).show()
+                                            expandedMenuId = null
+                                        },
+                                        onDelete = {
+                                            ClipboardHistoryManager.removeItem(context, item.id)
+                                            history = ClipboardHistoryManager.getHistory(context)
+                                            expandedMenuId = null
+                                        },
+                                        onPin = {
+                                            ClipboardHistoryManager.togglePin(context, item.id)
+                                            history = ClipboardHistoryManager.getHistory(context)
+                                            expandedMenuId = null
+                                        }
+                                    )
+                                }
                             }
                         }
                     }
@@ -682,7 +780,7 @@ fun NotesScreen(
             }
 
             // Нижняя панель массового выбора (Batch operations)
-            if (isSelectionMode) {
+            if (localSelectionMode) {
                 NotesSelectionBottomPanel(
                     selectedCount = selectedItemIds.size,
                     onPinToggle = {
@@ -690,7 +788,7 @@ fun NotesScreen(
                             ClipboardHistoryManager.togglePin(context, id)
                         }
                         history = ClipboardHistoryManager.getHistory(context)
-                        onSelectionModeChange(false)
+                        updateSelectionMode(false)
                         selectedItemIds = emptySet()
                     },
                     onDelete = {
@@ -698,7 +796,7 @@ fun NotesScreen(
                             ClipboardHistoryManager.removeItem(context, id)
                         }
                         history = ClipboardHistoryManager.getHistory(context)
-                        onSelectionModeChange(false)
+                        updateSelectionMode(false)
                         selectedItemIds = emptySet()
                     },
                     modifier = Modifier
@@ -749,18 +847,12 @@ fun NotesSelectionBottomPanel(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceEvenly
         ) {
-            SelectionActionButton(
-                icon = Icons.Filled.Star,
-                label = "Избранное",
-                enabled = selectedCount > 0,
-                onClick = onPinToggle
-            )
-            SelectionActionButton(
-                icon = Icons.Default.Delete,
-                label = "Удалить",
-                enabled = selectedCount > 0,
-                onClick = onDelete
-            )
+            IconButton(onClick = onPinToggle) {
+                Icon(Icons.Default.Star, contentDescription = "Pin", tint = Color.White)
+            }
+            IconButton(onClick = onDelete) {
+                Icon(Icons.Default.Delete, contentDescription = "Delete", tint = Color(0xFFFF5555))
+            }
         }
     }
 }

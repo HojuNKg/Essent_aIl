@@ -38,6 +38,10 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(keyMap: KeyMap, onBack: () -> Unit) {
+    BackHandler(enabled = true) {
+        onBack()
+    }
+
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
     var isDraggingSlider by remember { mutableStateOf(false) }

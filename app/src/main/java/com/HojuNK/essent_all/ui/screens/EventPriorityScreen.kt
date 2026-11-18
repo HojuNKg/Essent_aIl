@@ -1,5 +1,6 @@
 package com.HojuNK.essent_all.ui.screens
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
@@ -61,6 +62,10 @@ fun EventPriorityScreen(
     onBack: () -> Unit,
     onSave: (List<EventRule>) -> Unit
 ) {
+    BackHandler(enabled = true) {
+        onBack()
+    }
+
     val scope = rememberCoroutineScope()
     var savedEvents by remember { mutableStateOf(keyMap.events) }
     var tempEvents by remember { mutableStateOf(keyMap.events) }

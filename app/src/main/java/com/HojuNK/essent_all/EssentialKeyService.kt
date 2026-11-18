@@ -16,6 +16,11 @@ import android.media.AudioManager
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
+import android.database.ContentObserver
+import android.provider.MediaStore
+import java.io.File
+import java.io.FileOutputStream
 import android.os.Build
 import android.content.pm.ActivityInfo
 import android.graphics.PixelFormat
@@ -43,6 +48,9 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsAnimationCompat
 import androidx.core.view.WindowInsetsCompat
 import com.HojuNK.essent_all.ui.components.ClipboardOverlayContent
+import com.HojuNK.essent_all.ui.components.ScreenSearchOverlayContent
+import com.HojuNK.essent_all.util.ScreenOcrHelper
+import com.HojuNK.essent_all.util.ScreenTextItem
 import com.HojuNK.essent_all.util.EventIconDisplay
 import androidx.lifecycle.Lifecycle
 
@@ -129,6 +137,197 @@ class EssentialKeyService : AccessibilityService(), LifecycleOwner, ViewModelSto
     private var activePanelSlot: TapSlot? = null
     
     private val windowManager by lazy { getSystemService(WINDOW_SERVICE) as WindowManager }
+    private lateinit var clipboardManager: ClipboardManager
+    private var focusWindowView: View? = null
+    private var lastClipHash: Int = 0
+    private var lastTriggerTime: Long = 0L
+
+    private val clipListener = ClipboardManager.OnPrimaryClipChangedListener {
+        Log.d(TAG, "clip changed listener fired")
+        readClipboardViaFocusWindow()
+    }
+
+    private fun readClipboardViaFocusWindow() {
+        if (focusWindowView != null) {
+            return
+        }
+
+        val view = View(this)
+        focusWindowView = view
+
+        val params = WindowManager.LayoutParams(
+            1, 1,
+            WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
+            WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE,
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            gravity = Gravity.TOP or Gravity.START
+            x = 0
+            y = 0
+        }
+
+        view.viewTreeObserver.addOnWindowFocusChangeListener { hasFocus ->
+            if (hasFocus) {
+                Log.d(TAG, "focus window gained focus, reading clipboard")
+                processClipboard()
+                handler.post { removeFocusWindow() }
+            }
+        }
+
+        try {
+            windowManager.addView(view, params)
+            Log.d(TAG, "focus window added")
+        } catch (e: Exception) {
+            Log.e(TAG, "failed to add focus window: ${e.message}")
+            focusWindowView = null
+        }
+
+        handler.postDelayed({
+            removeFocusWindow()
+        }, 500)
+    }
+
+    private fun processClipboard() {
+        val clip = clipboardManager.primaryClip
+        if (clip == null || clip.itemCount == 0) {
+            Log.d(TAG, "clipboard read returned null/empty")
+            return
+        }
+
+        val item = clip.getItemAt(0)
+        val description = clip.description
+
+        when {
+            description?.hasMimeType("image/*") == true || item.uri != null -> {
+                item.uri?.let { handleImageClip(it) }
+            }
+            else -> {
+                val text = item.coerceToText(this)?.toString() ?: ""
+                if (text.isNotEmpty()) {
+                    val hash = text.hashCode()
+                    if (hash != lastClipHash) {
+                        lastClipHash = hash
+                        Log.d(TAG, "clipboard text read: ${text.take(50)}...")
+                        ClipboardHistoryManager.addItem(this, text, "text")
+                    }
+                }
+            }
+        }
+    }
+
+    private fun handleImageClip(uri: Uri) {
+        try {
+            contentResolver.takePersistableUriPermission(
+                uri,
+                Intent.FLAG_GRANT_READ_URI_PERMISSION
+            )
+        } catch (e: SecurityException) {
+            Log.d(TAG, "no persistable permission, reading immediately")
+        }
+
+        try {
+            contentResolver.openInputStream(uri)?.use { input ->
+                val bitmap = BitmapFactory.decodeStream(input)
+                if (bitmap != null) {
+                    val file = File(filesDir, "clip_${System.currentTimeMillis()}.png")
+                    FileOutputStream(file).use { out ->
+                        bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
+                    }
+                    val path = file.absolutePath
+                    val hash = path.hashCode()
+                    if (hash != lastClipHash) {
+                        lastClipHash = hash
+                        Log.d(TAG, "image clip saved and added: $path")
+                        val imageJson = """{"blocks":[{"type":"image","path":"$path","thumb":false}]}"""
+                        ClipboardHistoryManager.addItem(this, imageJson, "image")
+                    }
+                } else {
+                    Log.d(TAG, "bitmap decode failed")
+                }
+            } ?: Log.d(TAG, "openInputStream returned null for $uri")
+        } catch (e: Exception) {
+            Log.e(TAG, "error reading image clip: ${e.message}", e)
+        }
+    }
+
+    private val screenshotObserver = object : ContentObserver(Handler(Looper.getMainLooper())) {
+        override fun onChange(selfChange: Boolean, uri: Uri?) {
+            uri ?: return
+            checkIfScreenshot(uri)
+        }
+    }
+
+    private fun registerScreenshotWatcher() {
+        try {
+            contentResolver.registerContentObserver(
+                MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+                true,
+                screenshotObserver
+            )
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to register screenshot watcher", e)
+        }
+    }
+
+    private fun unregisterScreenshotWatcher() {
+        try {
+            contentResolver.unregisterContentObserver(screenshotObserver)
+        } catch (e: Exception) {}
+    }
+
+    private var lastScreenshotPath: String = ""
+
+    private fun checkIfScreenshot(uri: Uri) {
+        try {
+            val projection = arrayOf(
+                MediaStore.Images.Media.DATA,
+                MediaStore.Images.Media.DATE_ADDED
+            )
+            contentResolver.query(uri, projection, null, null, null)?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    val dataIndex = cursor.getColumnIndex(MediaStore.Images.Media.DATA)
+                    if (dataIndex != -1) {
+                        val path = cursor.getString(dataIndex)
+                        if (!path.isNullOrBlank() && path.contains("Screenshot", ignoreCase = true)) {
+                            if (path != lastScreenshotPath) {
+                                val file = File(path)
+                                if (file.exists() && file.length() > 0) {
+                                    lastScreenshotPath = path
+                                    Log.d(TAG, "screenshot detected and verified: $path")
+                                    val imageJson = """{"blocks":[{"type":"image","path":"$path","thumb":false}]}"""
+                                    ClipboardHistoryManager.addItem(this, imageJson, "image")
+                                } else {
+                                    handler.postDelayed({
+                                        val f = File(path)
+                                        if (f.exists() && f.length() > 0 && path != lastScreenshotPath) {
+                                            lastScreenshotPath = path
+                                            Log.d(TAG, "screenshot verified on retry: $path")
+                                            val imageJson = """{"blocks":[{"type":"image","path":"$path","thumb":false}]}"""
+                                            ClipboardHistoryManager.addItem(this, imageJson, "image")
+                                        }
+                                    }, 800L)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error checking screenshot: ${e.message}")
+        }
+    }
+
+    private fun removeFocusWindow() {
+        focusWindowView?.let {
+            try {
+                windowManager.removeView(it)
+                Log.d(TAG, "focus window removed")
+            } catch (e: Exception) {
+                Log.e(TAG, "error removing focus window: ${e.message}")
+            }
+        }
+        focusWindowView = null
+    }
     private val states = mutableMapOf<ControlType, Boolean>()
 
     private var isClipboardOverlayOpen = false
@@ -1030,6 +1229,7 @@ class EssentialKeyService : AccessibilityService(), LifecycleOwner, ViewModelSto
             }
             Config.ACTION_CLIPBOARD -> showClipboardOverlay()
             Config.ACTION_CLEAR_NOTIFICATIONS -> clearAllNotifications()
+            Config.ACTION_SEARCH_SCREEN -> startScreenSearch()
             Config.ACTION_KILL_ESSENTIAL -> setupKill(1, false, slot)
             Config.ACTION_KILL_NOTES -> setupKill(slot.let { if (it == TapSlot.LONG) 2 else 1 }, false, slot)
             Config.ACTION_CUSTOM_PANEL, Config.ACTION_CONTROLS -> setupKill(slot.let { if (it == TapSlot.LONG) 2 else 1 }, true, slot)
@@ -1694,6 +1894,20 @@ class EssentialKeyService : AccessibilityService(), LifecycleOwner, ViewModelSto
                 Log.d(TAG, "Window changed: previous=$previousPackage, current=$currentPackage")
             }
         }
+
+        val now = SystemClock.elapsedRealtime()
+        if (now - lastTriggerTime >= 300) {
+            if (event?.eventType == AccessibilityEvent.TYPE_VIEW_TEXT_SELECTION_CHANGED ||
+                event?.eventType == AccessibilityEvent.TYPE_VIEW_CLICKED) {
+                val text = event.text.joinToString()
+                if (text.contains("Копировать", ignoreCase = true) ||
+                    text.contains("Copy", ignoreCase = true)) {
+                    lastTriggerTime = now
+                    Log.d(TAG, "copy action detected via event")
+                    readClipboardViaFocusWindow()
+                }
+            }
+        }
     }
     override fun onInterrupt() {}
 
@@ -2250,6 +2464,90 @@ class EssentialKeyService : AccessibilityService(), LifecycleOwner, ViewModelSto
 
     private fun toggleTorch() { val id = torchCameraId ?: return; try { val next = !torchOn; cameraManager.setTorchMode(id, next); torchOn = next } catch (e: Exception) {} }
 
+    private var screenSearchOverlayView: View? = null
+
+    private fun startScreenSearch() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            try {
+                Toast.makeText(this, "Сканирование экрана...", Toast.LENGTH_SHORT).show()
+                takeScreenshot(0, mainExecutor, object : TakeScreenshotCallback {
+                    override fun onSuccess(screenshot: ScreenshotResult) {
+                        val hardwareBuffer = screenshot.hardwareBuffer
+                        val colorSpace = screenshot.colorSpace
+                        val bitmap = try {
+                            Bitmap.wrapHardwareBuffer(hardwareBuffer, colorSpace)?.copy(Bitmap.Config.ARGB_8888, false)
+                        } catch (e: Exception) { null }
+                        hardwareBuffer.close()
+
+                        if (bitmap != null) {
+                            val ocrHelper = ScreenOcrHelper(this@EssentialKeyService)
+                            ocrHelper.recognizeBitmap(bitmap) { textItems ->
+                                handler.post {
+                                    showScreenSearchOverlay(bitmap, textItems)
+                                }
+                            }
+                        } else {
+                            handler.post {
+                                Toast.makeText(this@EssentialKeyService, "Не удалось захватить кадр экрана", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    }
+
+                    override fun onFailure(errorCode: Int) {
+                        Log.e(TAG, "Screen Search screenshot failed: $errorCode")
+                        handler.post {
+                            Toast.makeText(this@EssentialKeyService, "Ошибка создания скриншота", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                })
+            } catch (e: Exception) {
+                Log.e(TAG, "startScreenSearch exception: ${e.message}")
+            }
+        }
+    }
+
+    private fun showScreenSearchOverlay(bitmap: Bitmap, textItems: List<ScreenTextItem>) {
+        closeScreenSearchOverlay()
+
+        val composeView = ComposeView(this).apply {
+            setContent {
+                ScreenSearchOverlayContent(
+                    screenshot = bitmap,
+                    textItems = textItems,
+                    onClose = { closeScreenSearchOverlay() }
+                )
+            }
+        }
+
+        composeView.setViewTreeLifecycleOwner(this)
+        composeView.setViewTreeViewModelStoreOwner(this)
+        composeView.setViewTreeSavedStateRegistryOwner(this)
+
+        val params = WindowManager.LayoutParams(
+            WindowManager.LayoutParams.MATCH_PARENT,
+            WindowManager.LayoutParams.MATCH_PARENT,
+            WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
+            WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
+            PixelFormat.TRANSLUCENT
+        )
+
+        try {
+            windowManager.addView(composeView, params)
+            screenSearchOverlayView = composeView
+        } catch (e: Exception) {
+            Log.e(TAG, "Error adding screen search overlay: ${e.message}")
+        }
+    }
+
+    private fun closeScreenSearchOverlay() {
+        screenSearchOverlayView?.let { view ->
+            try {
+                windowManager.removeView(view)
+            } catch (e: Exception) {}
+            screenSearchOverlayView = null
+        }
+    }
+
     private fun showFreezeOverlay(keyMap: KeyMap, isOverride: Boolean) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             try {
@@ -2579,6 +2877,11 @@ class EssentialKeyService : AccessibilityService(), LifecycleOwner, ViewModelSto
 
     override fun onDestroy() {
         super.onDestroy()
+        try {
+            clipboardManager.removePrimaryClipChangedListener(clipListener)
+        } catch (e: Exception) {}
+        unregisterScreenshotWatcher()
+        removeFocusWindow()
         if (instance == this) instance = null
     }
 
@@ -2586,6 +2889,13 @@ class EssentialKeyService : AccessibilityService(), LifecycleOwner, ViewModelSto
         super.onServiceConnected(); 
         instance = this
         isAccessibilityConnected = true
+        clipboardManager = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
+        try {
+            clipboardManager.addPrimaryClipChangedListener(clipListener)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to add clip listener", e)
+        }
+        registerScreenshotWatcher()
         com.HojuNK.essent_all.util.GlyphController.init(this)
         
         val info = serviceInfo

@@ -72,13 +72,28 @@ fun MoreScreen(
     onNotesSelectedCountChanged: (Int) -> Unit = {},
     onNotesSelectAllActionChanged: (() -> Unit) -> Unit = {},
     isNotesSearchActive: Boolean = false,
-    onNotesSearchActiveChange: (Boolean) -> Unit = {}
+    onNotesSearchActiveChange: (Boolean) -> Unit = {},
+    onBack: (() -> Unit)? = null
 ) {
     val radialMenuState = LocalRadialMenuState.current
     var activeSubScreen by remember { mutableStateOf<NavScreen?>(null) }
 
-    BackHandler(enabled = activeSubScreen == null) {
-        // Do nothing on main More screen
+    val isAnySelectionActive = isSelectionMode || isEventsSelectionMode || isMacrosSelectionMode || isNotesSelectionMode
+    BackHandler(enabled = isEditingHotbar || (activeSubScreen == null && (isAnySelectionActive || onBack != null))) {
+        when {
+            isEditingHotbar -> {
+                onToggleEditHotbar()
+            }
+            isAnySelectionActive -> {
+                if (isSelectionMode) onSelectionModeChange(false)
+                if (isEventsSelectionMode) onEventsSelectionModeChange(false)
+                if (isMacrosSelectionMode) onMacrosSelectionModeChange(false)
+                if (isNotesSelectionMode) onNotesSelectionModeChange(false)
+            }
+            else -> {
+                onBack?.invoke()
+            }
+        }
     }
 
     LaunchedEffect(activeSubScreen) {

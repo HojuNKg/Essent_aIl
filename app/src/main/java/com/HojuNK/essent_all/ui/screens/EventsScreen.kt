@@ -296,7 +296,6 @@ fun EventsScreen(
     var initialSelectionBeforeDrag by remember { mutableStateOf(setOf<String>()) }
     var dragTargetState by remember { mutableStateOf<Boolean?>(null) }
 
-    // Handle system back gesture when in selection mode or inside a group
     BackHandler(enabled = localSelectionMode) {
         updateSelectionMode(false)
         selectedEventIds = emptySet()
@@ -306,12 +305,8 @@ fun EventsScreen(
         openedGroup = null
     }
 
-    BackHandler(enabled = onBack != null && !localSelectionMode && openedGroup == null) {
+    BackHandler(enabled = !localSelectionMode && openedGroup == null && onBack != null) {
         onBack?.invoke()
-    }
-
-    BackHandler(enabled = onBack == null && !localSelectionMode && openedGroup == null) {
-        // Do nothing when in hotbar
     }
 
     val handleFilterToggle: (EventFilter) -> Unit = { filter ->

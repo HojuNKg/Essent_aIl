@@ -28,6 +28,7 @@ import android.view.Surface as ViewSurface
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.HojuNK.essent_all.R
 import com.HojuNK.essent_all.*
 import com.HojuNK.essent_all.model.*
@@ -74,15 +75,13 @@ fun GlyphPatternsScreen(
     var selectedPatternIds by remember { mutableStateOf(setOf<String>()) }
     var showBatchDeleteConfirm by remember { mutableStateOf(false) }
 
-    BackHandler(enabled = true) {
-        if (localSelectionMode) {
-            updateSelectionMode(false)
-            selectedPatternIds = emptySet()
-        } else if (onBack != null) {
-            onBack()
-        } else {
-            // Do nothing when in hotbar
-        }
+    BackHandler(enabled = localSelectionMode) {
+        updateSelectionMode(false)
+        selectedPatternIds = emptySet()
+    }
+
+    BackHandler(enabled = !localSelectionMode && onBack != null) {
+        onBack?.invoke()
     }
 
     val sortedPatterns = remember(keyMap.glyphPatterns, keyMap.glyphPatternsSortOption, keyMap.glyphPatternsSortAscending) {
@@ -109,7 +108,10 @@ fun GlyphPatternsScreen(
                             if (localSelectionMode) {
                                 Text(stringResource(R.string.selected_count, selectedPatternIds.size), color = textColor, fontWeight = FontWeight.Bold)
                             } else {
-                                TypewriterTitle(targetText = stringResource(R.string.games_title), animate = false)
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    TypewriterTitle(targetText = stringResource(R.string.games_title), animate = false)
+                                    Text(" (бета)", color = Color.Gray, fontWeight = FontWeight.Light, fontSize = 20.sp)
+                                }
                             }
                         },
                         colors = TopAppBarDefaults.topAppBarColors(

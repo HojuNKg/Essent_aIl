@@ -4,6 +4,7 @@ import android.content.Intent
 import android.content.pm.ActivityInfo
 import android.os.Bundle
 import android.provider.Settings
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.PredictiveBackHandler
@@ -41,6 +42,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.lerp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -269,11 +271,42 @@ fun MainContent(intent: Intent) {
                                         (currentScreen == NavScreen.MORE && isGlyphsSelectionMode)
                 val isHotbarHidden = (isAppLoading || anyEditorVisible || isActionPickerOpen || isSelectionActive || isMoreSubScreenActive) && !isEditingHotbar
 
-                BackHandler(enabled = isEditingHotbar) {
-                    scope.launch {
-                        Config.setHotbarMiddleScreens(ctx, pendingMiddleScreens.value)
+                val visualPagerPosition = remember { Animatable(0f) }
+                val isTabClicking = remember { mutableStateOf(false) }
+                val jumpSource = remember { mutableStateOf(0) }
+                val jumpTarget = remember { mutableStateOf(0) }
+                val isDraggingHotbar = remember { mutableStateOf(false) }
+
+                var lastBackPressTime by remember { mutableStateOf(0L) }
+                val handleHotbarBack: () -> Unit = {
+                    if (pagerState.currentPage > 0) {
+                        scope.launch {
+                            jumpSource.value = pagerState.currentPage
+                            jumpTarget.value = 0
+                            isTabClicking.value = true
+                            launch {
+                                visualPagerPosition.animateTo(
+                                    0f,
+                                    animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow)
+                                )
+                            }
+                            launch {
+                                pagerState.animateScrollToPage(
+                                    0,
+                                    animationSpec = tween(durationMillis = 500, easing = FastOutSlowInEasing)
+                                )
+                                isTabClicking.value = false
+                            }
+                        }
+                    } else {
+                        val currentTime = System.currentTimeMillis()
+                        if (currentTime - lastBackPressTime < 2000) {
+                            activity?.finish()
+                        } else {
+                            lastBackPressTime = currentTime
+                            Toast.makeText(ctx, "Чтобы выйти, выполните двойной жест назад", Toast.LENGTH_SHORT).show()
+                        }
                     }
-                    isEditingHotbar = false
                 }
 
                 var predictiveBackTarget by remember { mutableStateOf<String?>(null) }
@@ -292,6 +325,23 @@ fun MainContent(intent: Intent) {
                     showSettings -> "settings"
                     showEventPriority -> "event_priority"
                     else -> null
+                }
+
+                BackHandler(enabled = radialMenuState != null) {
+                    radialMenuState = null
+                }
+
+                BackHandler(enabled = activeOverlay != null) {
+                    when (activeOverlay) {
+                        "editing_event" -> editingEvent = null
+                        "editing_macro" -> editingMacro = null
+                        "recorded_macro" -> recordedMacroActions = null
+                        "editing_glyph" -> editingGlyphPattern = null
+                        "edit_slot" -> editSlot = null
+                        "action_picker" -> activeBlockDetail = null
+                        "settings" -> showSettings = false
+                        "event_priority" -> showEventPriority = false
+                    }
                 }
 
                 PredictiveBackHandler(enabled = activeOverlay != null) { progressFlow ->
@@ -340,11 +390,6 @@ fun MainContent(intent: Intent) {
                     var headerWidth by remember { mutableStateOf(0f) }
                     
                     // Независимая визуальная позиция для хотбара
-                    val visualPagerPosition = remember { Animatable(0f) }
-                    val isTabClicking = remember { mutableStateOf(false) }
-                    val jumpSource = remember { mutableStateOf(0) }
-                    val jumpTarget = remember { mutableStateOf(0) }
-                    val isDraggingHotbar = remember { mutableStateOf(false) }
                     
                     // Анимация "глубины" при перетаскивании
                     val dragDepth by animateFloatAsState(
@@ -417,7 +462,8 @@ fun MainContent(intent: Intent) {
                                     apps = apps, 
                                     onOpenSettings = { showSettings = true },
                                     onActionPickerStateChange = { isActionPickerOpen = it },
-                                    onOpenBlockDetail = { title, slots -> activeBlockDetail = Pair(title, slots) }
+                                    onOpenBlockDetail = { title, slots -> activeBlockDetail = Pair(title, slots) },
+                                    onBack = handleHotbarBack
                                 )
                                 NavScreen.EVENTS -> EventsScreen(
                                     keyMap = keyMap, 
@@ -442,7 +488,8 @@ fun MainContent(intent: Intent) {
                                     },
                                     onGroupDeleteActionChanged = { action ->
                                         landscapeGroupDeleteAction = action
-                                    }
+                                    },
+                                    onBack = handleHotbarBack
                                 )
                                 NavScreen.MACROS -> MacrosScreen(
                                     keyMap = keyMap, 
@@ -451,7 +498,8 @@ fun MainContent(intent: Intent) {
                                     onEditMacro = { editingMacro = it }, 
                                     onShowAccessibilityError = { showAccessibilityError = true },
                                     isSelectionMode = isMacrosSelectionMode,
-                                    onSelectionModeChange = { isMacrosSelectionMode = it }
+                                    onSelectionModeChange = { isMacrosSelectionMode = it },
+                                    onBack = handleHotbarBack
                                 )
                                 NavScreen.GLYPHS -> GlyphPatternsScreen(
                                     keyMap = keyMap,
@@ -460,14 +508,15 @@ fun MainContent(intent: Intent) {
                                     onEditPattern = { editingGlyphPattern = it },
                                     onShowAccessibilityError = { showAccessibilityError = true },
                                     isSelectionMode = isGlyphsSelectionMode,
-                                    onSelectionModeChange = { isGlyphsSelectionMode = it }
+                                    onSelectionModeChange = { isGlyphsSelectionMode = it },
+                                    onBack = handleHotbarBack
                                 )
                                 NavScreen.NOTES -> NotesScreen(
                                     keyMap = keyMap,
                                     apps = apps,
                                     onOpenSettings = { showSettings = true },
                                     onShowAccessibilityError = { showAccessibilityError = true },
-                                    onBack = null,
+                                    onBack = handleHotbarBack,
                                     onEditorToggle = { isNotesEditorOpen = it },
                                     isSelectionMode = isNotesSelectionMode,
                                     onSelectionModeChange = { isNotesSelectionMode = it },
@@ -520,7 +569,8 @@ fun MainContent(intent: Intent) {
                                     isEventsSelectionMode = isEventsSelectionMode,
                                     onEventsSelectionModeChange = { isEventsSelectionMode = it },
                                     isMacrosSelectionMode = isMacrosSelectionMode,
-                                    onMacrosSelectionModeChange = { isMacrosSelectionMode = it }
+                                    onMacrosSelectionModeChange = { isMacrosSelectionMode = it },
+                                    onBack = handleHotbarBack
                                 )
                             }
                         }
@@ -616,9 +666,18 @@ fun MainContent(intent: Intent) {
                                     when (currentScreen) {
                                         NavScreen.KEY -> TypewriterTitle(animate = true)
                                         NavScreen.EVENTS -> TypewriterTitle(targetText = stringResource(R.string.events), animate = false)
-                                        NavScreen.MACROS -> TypewriterTitle(targetText = stringResource(R.string.nav_macros), animate = false)
-                                        NavScreen.GLYPHS -> TypewriterTitle(targetText = stringResource(R.string.games_title), animate = false)
-                                        NavScreen.NOTES -> TypewriterTitle(targetText = "Заметки", animate = false)
+                                        NavScreen.MACROS -> Row(verticalAlignment = Alignment.CenterVertically) {
+                                            TypewriterTitle(targetText = stringResource(R.string.nav_macros), animate = false)
+                                            Text(" (бета)", color = Color.Gray, fontWeight = FontWeight.Light, fontSize = 20.sp)
+                                        }
+                                        NavScreen.GLYPHS -> Row(verticalAlignment = Alignment.CenterVertically) {
+                                            TypewriterTitle(targetText = stringResource(R.string.games_title), animate = false)
+                                            Text(" (бета)", color = Color.Gray, fontWeight = FontWeight.Light, fontSize = 20.sp)
+                                        }
+                                        NavScreen.NOTES -> Row(verticalAlignment = Alignment.CenterVertically) {
+                                            TypewriterTitle(targetText = "Заметки", animate = false)
+                                            Text(" (бета)", color = Color.Gray, fontWeight = FontWeight.Light, fontSize = 20.sp)
+                                        }
                                         NavScreen.MORE -> TypewriterTitle(targetText = stringResource(R.string.nav_more), animate = false)
                                     }
                                     Row(verticalAlignment = Alignment.CenterVertically) {

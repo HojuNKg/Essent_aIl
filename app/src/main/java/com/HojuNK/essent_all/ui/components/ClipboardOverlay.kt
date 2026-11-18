@@ -18,6 +18,9 @@ import org.json.JSONArray
 import org.json.JSONObject
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
+import androidx.compose.material.icons.automirrored.filled.FormatListBulleted
+import androidx.compose.material.icons.filled.FormatListNumbered
+import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
@@ -446,82 +449,6 @@ fun BlinkingCaretAtRect(rect: Rect) {
     )
 }
 
-@Composable
-fun OverlayCustomTextField(
-    value: TextFieldValue,
-    onValueChange: (TextFieldValue) -> Unit,
-    focusRequester: FocusRequester,
-    placeholder: String = "Введите текст записи..."
-) {
-    var textLayoutResult by remember { mutableStateOf<TextLayoutResult?>(null) }
-    var isFocused by remember { mutableStateOf(false) }
-
-    val cursorRect = remember(textLayoutResult, value.selection, value.text) {
-        val layout = textLayoutResult
-        if (layout != null) {
-            val index = value.selection.start.coerceIn(0, layout.layoutInput.text.length)
-            layout.getCursorRect(index)
-        } else null
-    }
-
-    val useDark = com.HojuNK.essent_all.LocalUseDark.current
-    val bgCol = if (useDark) Color(0xFF252525) else Color(0xFF1E1E1E)
-
-    CompositionLocalProvider(
-        LocalWindowInfo provides remember {
-            object : WindowInfo {
-                override val isWindowFocused: Boolean get() = true
-            }
-        }
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(min = 120.dp)
-                .clip(RoundedCornerShape(12.dp))
-                .background(bgCol)
-                .border(1.dp, Color(0xFF333333), RoundedCornerShape(12.dp))
-                .padding(16.dp)
-        ) {
-            BasicTextField(
-                value = value,
-                onValueChange = onValueChange,
-                onTextLayout = { textLayoutResult = it },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 100.dp)
-                    .focusRequester(focusRequester)
-                    .onFocusChanged { isFocused = it.isFocused },
-                textStyle = TextStyle(
-                    color = Color.White,
-                    fontSize = 15.sp,
-                    lineHeight = 22.sp
-                ),
-                cursorBrush = SolidColor(Color.Transparent),
-                decorationBox = { innerTextField ->
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(min = 100.dp),
-                        contentAlignment = Alignment.TopStart
-                    ) {
-                        if (value.text.isEmpty()) {
-                            Text(text = placeholder, color = Color.Gray, fontSize = 15.sp)
-                        }
-                        innerTextField()
-                        
-                        if (isFocused) {
-                            cursorRect?.let { rect ->
-                                BlinkingCaretAtRect(rect)
-                            }
-                        }
-                    }
-                }
-            )
-        }
-    }
-}
-
 sealed interface NoteBlockItem {
     data class TextBlock(val textFieldValue: TextFieldValue = TextFieldValue()) : NoteBlockItem
     data class ImageBlock(val path: String, val isThumbnail: Boolean = false) : NoteBlockItem
@@ -676,12 +603,12 @@ fun OverlayBlocksRenderer(
     isEditing: Boolean = false,
     onBlocksChanged: (List<NoteBlockItem>) -> Unit = {},
     focusRequester: FocusRequester? = null,
-    onTapTextToEdit: () -> Unit = {}
+    onTapTextToEdit: () -> Unit = {},
+    onSelectionChanged: (TextRange) -> Unit = {}
 ) {
+    val context = LocalContext.current
     val blocks = blocksList ?: parseNoteContentToBlocks(content)
     val renderGroups = groupBlocksForOverlay(blocks)
-    val useDark = com.HojuNK.essent_all.LocalUseDark.current
-    val textColor = if (useDark) Color.White else Color.Black
 
     LazyColumn(
         modifier = modifier,
@@ -694,40 +621,73 @@ fun OverlayBlocksRenderer(
                     val block = group.block
                     when (block) {
                         is NoteBlockItem.TextBlock -> {
-                            if (isEditing) {
-                                OverlayCustomTextField(
-                                    value = block.textFieldValue,
-                                    onValueChange = { newTfv ->
-                                        val updatedTfv = preserveSpansOnTextChange(block.textFieldValue.annotatedString, newTfv)
-                                        val mutable = blocks.toMutableList()
-                                        mutable[idx] = block.copy(textFieldValue = updatedTfv)
-                                        onBlocksChanged(mutable)
-                                    },
-                                    focusRequester = if (idx == 0 && focusRequester != null) focusRequester else remember { FocusRequester() },
-                                    placeholder = "Введите текст записи..."
-                                )
-                            } else {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clip(RoundedCornerShape(12.dp))
-                                        .background(if (useDark) Color(0xFF252525) else Color(0xFF1E1E1E))
-                                        .border(1.dp, Color(0xFF333333), RoundedCornerShape(12.dp))
-                                        .pointerInput(Unit) {
-                                            detectTapGestures(onTap = { onTapTextToEdit() })
-                                        }
-                                        .padding(14.dp)
-                                ) {
-                                    SelectionContainer {
-                                        Text(
-                                            text = block.textFieldValue.annotatedString,
-                                            color = textColor,
-                                            fontSize = 15.sp,
-                                            lineHeight = 22.sp
+                            RichAndroidTextField(
+                                textFieldValue = block.textFieldValue,
+                                onValueChange = { newTfv ->
+                                    val updatedTfv = preserveSpansOnTextChange(block.textFieldValue.annotatedString, newTfv)
+                                    val structuredValue = handleEnterAndAutoStructure(block.textFieldValue, updatedTfv)
+                                    val renumberedText = renumberLinesIfNeeded(structuredValue.text)
+                                    val finalTfv = if (renumberedText != structuredValue.text) {
+                                        structuredValue.copy(
+                                            annotatedString = formatCheckboxesInAnnotatedString(
+                                                AnnotatedString(text = renumberedText, spanStyles = structuredValue.annotatedString.spanStyles)
+                                            )
+                                        )
+                                    } else {
+                                        structuredValue.copy(
+                                            annotatedString = formatCheckboxesInAnnotatedString(structuredValue.annotatedString)
                                         )
                                     }
-                                }
-                            }
+                                    val mutable = blocks.toMutableList()
+                                    mutable[idx] = block.copy(textFieldValue = finalTfv)
+                                    onBlocksChanged(mutable)
+                                },
+                                onSelectionChanged = { range ->
+                                    onSelectionChanged(range)
+                                },
+                                readOnly = !isEditing,
+                                onImageReceived = { uri ->
+                                    val path = copyUriToInternalStorage(context, uri)
+                                    if (path != null) {
+                                        val mutable = blocks.toMutableList()
+                                        mutable.add(idx + 1, NoteBlockItem.ImageBlock(path = path))
+                                        onBlocksChanged(mutable)
+                                        Toast.makeText(context, "Фото вставлено из клавиатуры", Toast.LENGTH_SHORT).show()
+                                    }
+                                },
+                                onClick = {
+                                    if (!isEditing) {
+                                        onTapTextToEdit()
+                                    }
+                                },
+                                onToggleCheckboxAtLine = { lineIdx ->
+                                    val text = block.textFieldValue.text
+                                    val lines = text.split("\n").toMutableList()
+                                    if (lineIdx in lines.indices) {
+                                        val line = lines[lineIdx]
+                                        if (line.startsWith("☐")) {
+                                            lines[lineIdx] = line.replaceFirst("☐", "☑")
+                                        } else if (line.startsWith("☑")) {
+                                            lines[lineIdx] = line.replaceFirst("☑", "☐")
+                                        }
+                                        val newText = lines.joinToString("\n")
+                                        val newTfv = block.textFieldValue.copy(text = newText)
+                                        val mutable = blocks.toMutableList()
+                                        mutable[idx] = block.copy(textFieldValue = newTfv)
+                                        onBlocksChanged(mutable)
+                                        val finalContent = buildContentFromBlocks(mutable)
+                                        if (itemId.isNotEmpty()) {
+                                            val historyItem = ClipboardHistoryManager.getHistory(context).find { it.id == itemId }
+                                            if (historyItem != null) {
+                                                val updated = historyItem.copy(content = finalContent)
+                                                ClipboardHistoryManager.updateItem(context, updated)
+                                            }
+                                        }
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                placeholder = "Введите текст записи..."
+                            )
                         }
                         is NoteBlockItem.ImageBlock -> {
                             val bitmap = remember(block.path) {
@@ -737,40 +697,35 @@ fun OverlayBlocksRenderer(
                                     null
                                 }
                             }
-                            if (bitmap != null) {
-                                val aspectRatio = if (bitmap.height > 0) bitmap.width.toFloat() / bitmap.height.toFloat() else 1f
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clip(RoundedCornerShape(12.dp))
-                                        .background(Color(0xFF1A1A1A))
-                                        .padding(4.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
+                            val aspectRatio = if (bitmap != null && bitmap.height > 0) {
+                                bitmap.width.toFloat() / bitmap.height.toFloat()
+                            } else 1.77f
+
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .aspectRatio(aspectRatio.coerceIn(0.5f, 3.0f))
+                                    .clip(RoundedCornerShape(24.dp))
+                                    .background(Color(0xFF1A1A1A))
+                                    .border(1.dp, Color(0xFF333333), RoundedCornerShape(24.dp))
+                                    .clickable {
+                                        onTapTextToEdit()
+                                    }
+                            ) {
+                                if (bitmap != null) {
                                     Image(
                                         bitmap = bitmap.asImageBitmap(),
-                                        contentDescription = "Full Size Image",
-                                        contentScale = ContentScale.Fit,
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .aspectRatio(aspectRatio.coerceIn(0.2f, 5.0f))
-                                            .clip(RoundedCornerShape(8.dp))
+                                        contentDescription = "Inserted Image",
+                                        contentScale = ContentScale.FillWidth,
+                                        modifier = Modifier.fillMaxSize()
                                     )
-                                }
-                            } else {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clip(RoundedCornerShape(12.dp))
-                                        .background(Color(0xFF1A1A1A))
-                                        .padding(8.dp)
-                                ) {
-                                    Text(
-                                        text = "Фото: ${block.path}",
-                                        color = Color.Gray,
-                                        fontSize = 13.sp,
-                                        modifier = Modifier.padding(8.dp)
-                                    )
+                                } else {
+                                    Box(
+                                        modifier = Modifier.fillMaxSize(),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text("Ошибка загрузки картинки", color = Color.Gray)
+                                    }
                                 }
                             }
                         }
@@ -838,10 +793,10 @@ fun preserveSpansOnTextChange(
 
         if (diff > 0) {
             val changePos = (selStart - diff).coerceAtLeast(0)
-            if (changePos <= start) {
+            if (changePos < start) {
                 start += diff
                 end += diff
-            } else if (changePos in (start + 1)..end) {
+            } else if (changePos in start until end) {
                 end += diff
             }
         } else if (diff < 0) {
@@ -879,7 +834,7 @@ fun preserveSpansOnTextChange(
     return newTextValue.copy(
         annotatedString = AnnotatedString(
             text = newText,
-            spanStyles = newSpans
+            spanStyles = mergeAdjacentSpans(newSpans)
         )
     )
 }
@@ -923,17 +878,17 @@ fun applyStyleToAnnotatedString(
                 }
             }
         }
-        return AnnotatedString(text = text, spanStyles = newSpans)
+        return AnnotatedString(text = text, spanStyles = mergeAdjacentSpans(newSpans))
     }
 
     val overlappingSpans = existingSpans.filter { it.start < end && it.end > start }
     val isAlreadyApplied = when (formatType) {
-        FormatType.BOLD -> overlappingSpans.any { it.item.fontWeight == FontWeight.Bold }
-        FormatType.ITALIC -> overlappingSpans.any { it.item.fontStyle == FontStyle.Italic }
-        FormatType.UNDERLINE -> overlappingSpans.any { it.item.textDecoration?.contains(TextDecoration.Underline) == true }
-        FormatType.COLOR -> overlappingSpans.any { it.item.color == colorValue }
-        FormatType.SIZE -> overlappingSpans.any { it.item.fontSize == (16 + sizeOffset).sp }
-        FormatType.FONT -> overlappingSpans.any { it.item.fontFamily == fontFamilyValue }
+        FormatType.BOLD -> overlappingSpans.isNotEmpty() && overlappingSpans.all { it.item.fontWeight == FontWeight.Bold }
+        FormatType.ITALIC -> overlappingSpans.isNotEmpty() && overlappingSpans.all { it.item.fontStyle == FontStyle.Italic }
+        FormatType.UNDERLINE -> overlappingSpans.isNotEmpty() && overlappingSpans.all { it.item.textDecoration?.contains(TextDecoration.Underline) == true }
+        FormatType.COLOR -> overlappingSpans.isNotEmpty() && overlappingSpans.all { it.item.color == colorValue }
+        FormatType.SIZE -> overlappingSpans.isNotEmpty() && overlappingSpans.all { it.item.fontSize == (16 + sizeOffset).sp }
+        FormatType.FONT -> overlappingSpans.isNotEmpty() && overlappingSpans.all { it.item.fontFamily == fontFamilyValue }
         FormatType.CLEAR -> false
     }
 
@@ -962,9 +917,9 @@ fun applyStyleToAnnotatedString(
                 FormatType.BOLD -> if (isAlreadyApplied) style.copy(fontWeight = null) else style.copy(fontWeight = FontWeight.Bold)
                 FormatType.ITALIC -> if (isAlreadyApplied) style.copy(fontStyle = null) else style.copy(fontStyle = FontStyle.Italic)
                 FormatType.UNDERLINE -> if (isAlreadyApplied) style.copy(textDecoration = null) else style.copy(textDecoration = TextDecoration.Underline)
-                FormatType.COLOR -> style.copy(color = colorValue)
-                FormatType.SIZE -> style.copy(fontSize = (16 + sizeOffset).sp)
-                FormatType.FONT -> style.copy(fontFamily = fontFamilyValue)
+                FormatType.COLOR -> if (isAlreadyApplied) style.copy(color = Color.Unspecified) else style.copy(color = colorValue)
+                FormatType.SIZE -> if (isAlreadyApplied) style.copy(fontSize = TextUnit.Unspecified) else style.copy(fontSize = (16 + sizeOffset).sp)
+                FormatType.FONT -> if (isAlreadyApplied) style.copy(fontFamily = null) else style.copy(fontFamily = fontFamilyValue)
                 FormatType.CLEAR -> SpanStyle()
             }
 
@@ -975,23 +930,37 @@ fun applyStyleToAnnotatedString(
     }
 
     if (!isAlreadyApplied && formatType != FormatType.CLEAR) {
-        var baseStyle = SpanStyle()
-        for (range in overlappingSpans) {
-            baseStyle = range.item
-            break
-        }
-        val newStyle = when (formatType) {
-            FormatType.BOLD -> baseStyle.copy(fontWeight = FontWeight.Bold)
-            FormatType.ITALIC -> baseStyle.copy(fontStyle = FontStyle.Italic)
-            FormatType.UNDERLINE -> baseStyle.copy(textDecoration = TextDecoration.Underline)
-            FormatType.COLOR -> if (colorValue != Color.Unspecified) baseStyle.copy(color = colorValue) else baseStyle
-            FormatType.SIZE -> baseStyle.copy(fontSize = (16 + sizeOffset).sp)
-            FormatType.FONT -> baseStyle.copy(fontFamily = fontFamilyValue)
+        val targetStyle = when (formatType) {
+            FormatType.BOLD -> SpanStyle(fontWeight = FontWeight.Bold)
+            FormatType.ITALIC -> SpanStyle(fontStyle = FontStyle.Italic)
+            FormatType.UNDERLINE -> SpanStyle(textDecoration = TextDecoration.Underline)
+            FormatType.COLOR -> if (colorValue != Color.Unspecified) SpanStyle(color = colorValue) else null
+            FormatType.SIZE -> SpanStyle(fontSize = (16 + sizeOffset).sp)
+            FormatType.FONT -> if (fontFamilyValue != null) SpanStyle(fontFamily = fontFamilyValue) else null
             FormatType.CLEAR -> null
         }
-        if (newStyle != null && hasAnyAttribute(newStyle)) {
-            newSpans.removeIf { it.start >= start && it.end <= end }
-            newSpans.add(AnnotatedString.Range(newStyle, start, end))
+
+        if (targetStyle != null) {
+            val covered = mutableListOf<Pair<Int, Int>>()
+            for (range in existingSpans) {
+                val oStart = maxOf(range.start, start)
+                val oEnd = minOf(range.end, end)
+                if (oStart < oEnd) {
+                    covered.add(oStart to oEnd)
+                }
+            }
+            covered.sortBy { it.first }
+
+            var currentGapStart = start
+            for ((cStart, cEnd) in covered) {
+                if (cStart > currentGapStart) {
+                    newSpans.add(AnnotatedString.Range(targetStyle, currentGapStart, cStart))
+                }
+                currentGapStart = maxOf(currentGapStart, cEnd)
+            }
+            if (currentGapStart < end) {
+                newSpans.add(AnnotatedString.Range(targetStyle, currentGapStart, end))
+            }
         }
     }
 
@@ -1173,11 +1142,14 @@ fun ClipboardOverlayContent(
     var showColorPalette by remember { mutableStateOf(false) }
     var showSizeMenu by remember { mutableStateOf(false) }
     var showFontMenu by remember { mutableStateOf(false) }
+    var showStructureMenu by remember { mutableStateOf(false) }
+    var activeStructureType by remember { mutableStateOf(StructureType.BULLET) }
     var showSettingsMenu by remember { mutableStateOf(false) }
     var currentSizeOffset by remember { mutableIntStateOf(0) }
     var activeFontName by remember { mutableStateOf("system") }
     var undoStack by remember { mutableStateOf(listOf<List<NoteBlockItem>>()) }
     var redoStack by remember { mutableStateOf(listOf<List<NoteBlockItem>>()) }
+    var lastSelectedRange by remember { mutableStateOf(TextRange.Zero) }
 
     var currentBlocks by remember { mutableStateOf<List<NoteBlockItem>>(emptyList()) }
 
@@ -1215,12 +1187,10 @@ fun ClipboardOverlayContent(
             if (textBlockIdx != -1) {
                 val tb = mutableBlocks[textBlockIdx] as NoteBlockItem.TextBlock
                 val tfv = tb.textFieldValue
-                val start = if (tfv.selection.start == tfv.selection.end) 0 else tfv.selection.start
-                val end = if (tfv.selection.start == tfv.selection.end) tfv.text.length else tfv.selection.end
                 val newAnnotated = applyStyleToAnnotatedString(
                     current = tfv.annotatedString,
-                    selectionStart = start,
-                    selectionEnd = end,
+                    selectionStart = lastSelectedRange.start,
+                    selectionEnd = lastSelectedRange.end,
                     formatType = formatType,
                     colorValue = colorValue,
                     sizeOffset = sizeOffset,
@@ -1666,7 +1636,8 @@ fun ClipboardOverlayContent(
                                 onBlocksChanged = { newBlocks ->
                                     currentBlocks = newBlocks
                                 },
-                                focusRequester = focusRequester
+                                focusRequester = focusRequester,
+                                onSelectionChanged = { range -> lastSelectedRange = range }
                             )
 
                             LaunchedEffect(Unit) {
@@ -1775,7 +1746,8 @@ fun ClipboardOverlayContent(
                                     onBlocksChanged = { newBlocks ->
                                         currentBlocks = newBlocks
                                     },
-                                    focusRequester = focusRequester
+                                    focusRequester = focusRequester,
+                                    onSelectionChanged = { range -> lastSelectedRange = range }
                                 )
 
                                 LaunchedEffect(Unit) {
@@ -2102,6 +2074,25 @@ fun ClipboardOverlayContent(
                             Spacer(modifier = Modifier.height(6.dp))
                         }
 
+                        if (isEditingOrCreating && showStructureMenu) {
+                            StructureSelectionBar(
+                                activeType = activeStructureType,
+                                onSelectType = { selectedType ->
+                                    activeStructureType = selectedType
+                                    val mutable = currentBlocks.toMutableList()
+                                    val targetIdx = mutable.indexOfFirst { it is NoteBlockItem.TextBlock }
+                                    if (targetIdx >= 0) {
+                                        val block = mutable[targetIdx] as NoteBlockItem.TextBlock
+                                        val newTfv = applyStructureToTextBlock(block.textFieldValue, selectedType)
+                                        mutable[targetIdx] = block.copy(textFieldValue = newTfv)
+                                        currentBlocks = mutable
+                                    }
+                                    showStructureMenu = false
+                                }
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                        }
+
                         if (isEditingOrCreating && showColorPalette) {
                             ColorPaletteBar(
                                 palette = defaultColorPalette,
@@ -2188,6 +2179,33 @@ fun ClipboardOverlayContent(
                                                 imageVector = Icons.AutoMirrored.Filled.Redo,
                                                 contentDescription = "Redo",
                                                 tint = if (redoStack.isNotEmpty()) Color.White else Color.Gray,
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                        }
+                                    }
+
+                                    // Structure (Lists / Checkboxes)
+                                    Surface(
+                                        onClick = {
+                                            showStructureMenu = !showStructureMenu
+                                            showSizeMenu = false
+                                            showFontMenu = false
+                                            showColorPalette = false
+                                        },
+                                        shape = CircleShape,
+                                        color = Color(0xFF333333),
+                                        border = if (showStructureMenu) BorderStroke(2.dp, yellowColor) else null,
+                                        modifier = Modifier.size(40.dp)
+                                    ) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Icon(
+                                                imageVector = when (activeStructureType) {
+                                                    StructureType.BULLET -> Icons.AutoMirrored.Filled.FormatListBulleted
+                                                    StructureType.NUMBER -> Icons.Default.FormatListNumbered
+                                                    StructureType.CHECKBOX -> Icons.Default.Checklist
+                                                },
+                                                contentDescription = "Structure",
+                                                tint = Color.White,
                                                 modifier = Modifier.size(20.dp)
                                             )
                                         }
@@ -2591,6 +2609,9 @@ fun ClipboardCard(
     isMenuExpanded: Boolean = false,
     isNoteStyle: Boolean = false,
     maxLines: Int = 3,
+    isSelectionMode: Boolean = false,
+    isSelected: Boolean = false,
+    onSelectToggle: () -> Unit = {},
     onToggleMenu: () -> Unit,
     onTap: () -> Unit,
     onCopy: () -> Unit,
@@ -2604,13 +2625,21 @@ fun ClipboardCard(
                 .fillMaxWidth()
                 .combinedClickable(
                     onClick = {
-                        onTap()
+                        if (isSelectionMode) {
+                            onSelectToggle()
+                        } else {
+                            onTap()
+                        }
                     },
-                    onLongClick = onToggleMenu
+                    onLongClick = {
+                        if (!isSelectionMode) {
+                            onToggleMenu()
+                        }
+                    }
                 ),
             shape = RoundedCornerShape(16.dp),
             color = Color(0xFF252525),
-            border = BorderStroke(1.dp, Color(0xFF333333))
+            border = if (isSelected) BorderStroke(2.dp, Color.White) else BorderStroke(1.dp, Color(0xFF333333))
         ) {
             Row(
                 modifier = Modifier
@@ -2669,6 +2698,18 @@ fun ClipboardCard(
                             )
                         }
                     }
+                }
+                if (isSelectionMode) {
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Checkbox(
+                        checked = isSelected,
+                        onCheckedChange = { onSelectToggle() },
+                        colors = CheckboxDefaults.colors(
+                            checkedColor = Color.White,
+                            uncheckedColor = Color.Gray,
+                            checkmarkColor = Color.Black
+                        )
+                    )
                 }
             }
         }

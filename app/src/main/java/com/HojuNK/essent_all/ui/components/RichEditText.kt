@@ -17,10 +17,16 @@ class RichEditText @JvmOverloads constructor(
 ) : AppCompatEditText(context, attrs) {
 
     var onImageReceived: ((Uri) -> Unit)? = null
+    var onSelectionChangedCallback: ((Int, Int) -> Unit)? = null
+
+    override fun onSelectionChanged(selStart: Int, selEnd: Int) {
+        super.onSelectionChanged(selStart, selEnd)
+        onSelectionChangedCallback?.invoke(selStart, selEnd)
+    }
 
     init {
         val mimeTypes = arrayOf("image/png", "image/jpeg", "image/gif", "image/webp")
-        ViewCompat.setOnReceiveContentListener(this, mimeTypes) { _, payload ->
+        ViewCompat.setOnReceiveContentListener(this as android.view.View, mimeTypes) { _, payload ->
             val split = payload.partition { item -> item.uri != null }
             val uriContent = split.first
             val remaining = split.second
@@ -63,7 +69,7 @@ class RichEditText @JvmOverloads constructor(
             } finally {
                 try {
                     inputContentInfo.releasePermission()
-                } catch (e: Exception) {}
+                } catch (_: Exception) {}
             }
 
             true

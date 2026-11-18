@@ -446,6 +446,7 @@
     <string name="action_set_a_timer_title">Set Timer</string>
     <string name="action_recent_apps_title">Recent apps</string>
     <string name="action_read_screen_title">Read screen</string>
+    <string name="action_search_screen_title">Search screen</string>
     <string name="action_read_aloud_title">Read aloud</string>
     <string name="action_copy_title">Copy</string>
     <string name="action_paste_title">Paste</string>
@@ -473,4 +474,5 @@
     <string name="menu_paste">Paste</string>
     <string name="menu_favorite">Favorite</string>
     <string name="menu_delete">Delete</string>
+    <string name="action_test_clipboard_title">Clipboard Test</string>
 </resources>

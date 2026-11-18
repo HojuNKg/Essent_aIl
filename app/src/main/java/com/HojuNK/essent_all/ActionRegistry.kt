@@ -41,6 +41,7 @@ object ActionRegistry {
         // Capture & Reading
         ActionItem(Config.ACTION_SCREENSHOT, R.string.action_screenshot, ActionCategory.CAPTURE_READING),
         ActionItem(Config.ACTION_READ_SCREEN, R.string.action_read_screen_title, ActionCategory.CAPTURE_READING),
+        ActionItem(Config.ACTION_SEARCH_SCREEN, R.string.action_search_screen_title, ActionCategory.CAPTURE_READING),
         ActionItem(Config.ACTION_READ_ALOUD, R.string.action_read_aloud_title, ActionCategory.CAPTURE_READING),
         ActionItem(Config.ACTION_COPY, R.string.action_copy_title, ActionCategory.CAPTURE_READING),
         ActionItem(Config.ACTION_PASTE, R.string.action_paste_title, ActionCategory.CAPTURE_READING),

@@ -116,15 +116,13 @@ fun MacrosScreen(
     var selectedMacroIds by remember { mutableStateOf(setOf<String>()) }
     var showBatchDeleteConfirm by remember { mutableStateOf(false) }
 
-    BackHandler(enabled = true) {
-        if (localSelectionMode) {
-            updateSelectionMode(false)
-            selectedMacroIds = emptySet()
-        } else if (onBack != null) {
-            onBack()
-        } else {
-            // Do nothing when in hotbar
-        }
+    BackHandler(enabled = localSelectionMode) {
+        updateSelectionMode(false)
+        selectedMacroIds = emptySet()
+    }
+
+    BackHandler(enabled = !localSelectionMode && onBack != null) {
+        onBack?.invoke()
     }
 
     val sortedMacros = remember(keyMap.macros, keyMap.macrosSortOption, keyMap.macrosSortAscending) {
@@ -166,7 +164,10 @@ fun MacrosScreen(
                             if (localSelectionMode) {
                                 Text(stringResource(R.string.selected_count, selectedMacroIds.size), color = textColor, fontWeight = FontWeight.Bold)
                             } else {
-                                TypewriterTitle(targetText = stringResource(R.string.nav_macros), animate = false)
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    TypewriterTitle(targetText = stringResource(R.string.nav_macros), animate = false)
+                                    Text(" (бета)", color = Color.Gray, fontWeight = FontWeight.Light, fontSize = 20.sp)
+                                }
                             }
                         },
                         colors = TopAppBarDefaults.topAppBarColors(
